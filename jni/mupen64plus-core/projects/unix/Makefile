@@ -88,6 +88,15 @@ ifneq ("$(filter ppc64 powerpc64,$(HOST_CPU))","")
   NO_ASM := 1
   $(warning Architecture "$(HOST_CPU)" not officially supported.')
 endif
+ifneq ("$(filter aarch64,$(HOST_CPU))","")
+  CPU := ARM
+  ARCH_DETECTED := 64BITS
+  PIC ?= 1
+  NEW_DYNAREC := 1
+  CFLAGS += -DNEW_DYNAREC_DEBUG
+  LDFLAGS += -Wl,-Map,core.map
+  $(warning Architecture "$(HOST_CPU)" not officially supported.')
+endif
 ifneq ("$(filter arm%,$(HOST_CPU))","")
   ifeq ("$(filter arm%b,$(HOST_CPU))","")
     CPU := ARM
@@ -504,6 +513,8 @@ ifneq ($(NO_ASM), 1)
   ifeq ($(CPU), ARM)
     ifeq ($(ARCH_DETECTED), 32BITS)
       DYNAREC = arm
+    else
+      DYNAREC = aarch64
     endif
   endif
 endif
@@ -514,21 +525,25 @@ ifneq ($(DYNAREC), )
     ifeq ($(DYNAREC), x86)
       CFLAGS += -DNEW_DYNAREC=1
       SOURCE += \
-	    $(SRCDIR)/r4300/new_dynarec/x86/linkage_x86.asm
-    else
+        $(SRCDIR)/r4300/new_dynarec/x86/linkage_x86.asm \
+        $(SRCDIR)/r4300/new_dynarec/new_dynarec.c
+    endif
       ifeq ($(DYNAREC), arm)
         CFLAGS += -DNEW_DYNAREC=3
         SOURCE += \
          $(SRCDIR)/r4300/new_dynarec/arm/linkage_arm.S \
-         $(SRCDIR)/r4300/new_dynarec/arm/arm_cpu_features.c
-      else
-        $(error NEW_DYNAREC is only supported on 32 bit x86 and 32 bit armel)
+         $(SRCDIR)/r4300/new_dynarec/arm/arm_cpu_features.c \
+         $(SRCDIR)/r4300/new_dynarec/new_dynarec.c
       endif
+    ifeq ($(DYNAREC), aarch64)
+      CFLAGS += -DNEW_DYNAREC=4
+      SOURCE += \
+        $(SRCDIR)/r4300/new_dynarec/arm64/linkage_arm64.S \
+        $(SRCDIR)/r4300/new_dynarec/new_dynarec_64.c
     endif
 
     SOURCE += \
-      $(SRCDIR)/r4300/empty_dynarec.c \
-      $(SRCDIR)/r4300/new_dynarec/new_dynarec.c
+      $(SRCDIR)/r4300/empty_dynarec.c
   else
     SOURCE += \
       $(SRCDIR)/r4300/$(DYNAREC)/assemble.c \

@@ -18,32 +18,21 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.          *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include "main/main.h"
-
 int cycle_count;
 int last_count;
 int pcaddr;
 int pending_exception;
 int branch_target;
 uint64_t readmem_dword;
-static precomp_instr fake_pc;
 u_int memory_map[1048576];
-ALIGN(8, static u_int mini_ht[32][2]);
 ALIGN(4, u_char restore_candidate[512]);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-void do_interrupt();
-void jump_vaddr_eax();
-void jump_vaddr_ecx();
-void jump_vaddr_edx();
-void jump_vaddr_ebx();
-void jump_vaddr_ebp();
-void jump_vaddr_edi();
-#ifdef __cplusplus
-}
-#endif
+ALIGN(8, static u_int mini_ht[32][2]);
+static precomp_instr fake_pc;
+
+// We need these for cmovcc instructions on x86
+static const u_int const_zero=0;
+static const u_int const_one=1;
 
 static const u_int jump_vaddr_reg[8] = {
   (int)jump_vaddr_eax,
@@ -54,20 +43,6 @@ static const u_int jump_vaddr_reg[8] = {
   (int)jump_vaddr_ebp,
   0,
   (int)jump_vaddr_edi };
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-void invalidate_block_eax();
-void invalidate_block_ecx();
-void invalidate_block_edx();
-void invalidate_block_ebx();
-void invalidate_block_ebp();
-void invalidate_block_esi();
-void invalidate_block_edi();
-#ifdef __cplusplus
-}
-#endif
 
 static const u_int invalidate_block_reg[8] = {
   (int)invalidate_block_eax,
@@ -85,14 +60,7 @@ static const u_short rounding_modes[4] = {
   0xB3F, // ceil
   0x73F};// floor
 
-#include "../../fpu.h"
-
-// We need these for cmovcc instructions on x86
-static const u_int const_zero=0;
-static const u_int const_one=1;
-
 /* Linker */
-
 static void set_jump_target(int addr,int target)
 {
   u_char *ptr=(u_char *)addr;
@@ -114,7 +82,7 @@ static void set_jump_target(int addr,int target)
   }
 }
 
-void *dynamic_linker(void * src, u_int vaddr)
+static void *dynamic_linker(void * src, u_int vaddr)
 {
   u_int page=(vaddr^0x80000000)>>12;
   u_int vpage=page;
@@ -131,18 +99,31 @@ void *dynamic_linker(void * src, u_int vaddr)
       int *ptr2=(int*)((u_int)ptr + (u_int)*ptr + 4);
       assert((*ptr2&0xFF)==0x68);                   //push
       assert((*(int*)((u_int)ptr2+5)&0xFF)==0x68);  //push
-      assert((*(int*)((u_int)ptr2+10)&0xFF)==0xE8); //call
+      //assert((*(int*)((u_int)ptr2+10)&0xFF)==0xE8); //call
       add_link(vaddr, ptr2);
       u_int offset=(u_int)head->addr-(u_int)ptr-4;
       *ptr=offset;
+      #ifdef NEW_DYNAREC_DEBUG
+      print_debug_info(vaddr);
+      #endif
       return head->addr;
     }
     head=head->next;
   }
 
   u_int *ht_bin=hash_table[((vaddr>>16)^vaddr)&0xFFFF];
-  if(ht_bin[0]==vaddr) return (void *)ht_bin[1];
-  if(ht_bin[2]==vaddr) return (void *)ht_bin[3];
+  if(ht_bin[0]==vaddr){
+    #ifdef NEW_DYNAREC_DEBUG
+    print_debug_info(vaddr);
+    #endif
+    return (void *)ht_bin[1];
+  }
+  if(ht_bin[2]==vaddr){
+    #ifdef NEW_DYNAREC_DEBUG
+    print_debug_info(vaddr);
+    #endif
+    return (void *)ht_bin[3];
+  }
 
   head=jump_dirty[vpage];
   while(head!=NULL) {
@@ -173,6 +154,9 @@ void *dynamic_linker(void * src, u_int vaddr)
             ht_bin[1]=(int)head->addr;
             ht_bin[0]=vaddr;
           }
+          #ifdef NEW_DYNAREC_DEBUG
+          print_debug_info(vaddr);
+          #endif
           return head->addr;
         }
       }
@@ -192,7 +176,7 @@ void *dynamic_linker(void * src, u_int vaddr)
   return get_addr_ht(0x80000000);
 }
 
-void *dynamic_linker_ds(void * src, u_int vaddr)
+static void *dynamic_linker_ds(void * src, u_int vaddr)
 {
   u_int page=(vaddr^0x80000000)>>12;
   u_int vpage=page;
@@ -209,18 +193,31 @@ void *dynamic_linker_ds(void * src, u_int vaddr)
       int *ptr2=(int*)((u_int)ptr + (u_int)*ptr + 4);
       assert((*ptr2&0xFF)==0x68);                   //push
       assert((*(int*)((u_int)ptr2+5)&0xFF)==0x68);  //push
-      assert((*(int*)((u_int)ptr2+10)&0xFF)==0xE8); //call
+      //assert((*(int*)((u_int)ptr2+10)&0xFF)==0xE8); //call
       add_link(vaddr, ptr2);
       u_int offset=(u_int)head->addr-(u_int)ptr-4;
       *ptr=offset;
+      #ifdef NEW_DYNAREC_DEBUG
+      print_debug_info(vaddr);
+      #endif
       return head->addr;
     }
     head=head->next;
   }
 
   u_int *ht_bin=hash_table[((vaddr>>16)^vaddr)&0xFFFF];
-  if(ht_bin[0]==vaddr) return (void *)ht_bin[1];
-  if(ht_bin[2]==vaddr) return (void *)ht_bin[3];
+  if(ht_bin[0]==vaddr){
+    #ifdef NEW_DYNAREC_DEBUG
+    print_debug_info(vaddr);
+    #endif
+    return (void *)ht_bin[1];
+  }
+  if(ht_bin[2]==vaddr){
+    #ifdef NEW_DYNAREC_DEBUG
+    print_debug_info(vaddr);
+    #endif
+    return (void *)ht_bin[3];
+  }
 
   head=jump_dirty[vpage];
   while(head!=NULL) {
@@ -251,6 +248,9 @@ void *dynamic_linker_ds(void * src, u_int vaddr)
             ht_bin[1]=(int)head->addr;
             ht_bin[0]=vaddr;
           }
+          #ifdef NEW_DYNAREC_DEBUG
+          print_debug_info(vaddr);
+          #endif
           return head->addr;
         }
       }
@@ -349,39 +349,39 @@ static void get_bounds(int addr,u_int *start,u_int *end)
 
 // Note: registers are allocated clean (unmodified state)
 // if you intend to modify the register, you must call dirty_reg().
-static void alloc_reg(struct regstat *cur,int i,signed char reg)
+static void alloc_reg(struct regstat *cur,int i,signed char tr)
 {
   int r,hr;
-  int preferred_reg = (reg&3)+(reg>28)*4-(reg==32)+2*(reg==36)-(reg==40);
+  int preferred_reg = (tr&3)+(tr>28)*4-(tr==32)+2*(tr==36)-(tr==40);
   
   // Don't allocate unused registers
-  if((cur->u>>reg)&1) return;
+  if((cur->u>>tr)&1) return;
   
   // see if it's already allocated
   for(hr=0;hr<HOST_REGS;hr++)
   {
-    if(cur->regmap[hr]==reg) return;
+    if(cur->regmap[hr]==tr) return;
   }
   
   // Keep the same mapping if the register was already allocated in a loop
-  preferred_reg = loop_reg(i,reg,preferred_reg);
+  preferred_reg = loop_reg(i,tr,preferred_reg);
   
   // Try to allocate the preferred register
   if(cur->regmap[preferred_reg]==-1) {
-    cur->regmap[preferred_reg]=reg;
+    cur->regmap[preferred_reg]=tr;
     cur->dirty&=~(1<<preferred_reg);
     cur->isconst&=~(1<<preferred_reg);
     return;
   }
   r=cur->regmap[preferred_reg];
   if(r<64&&((cur->u>>r)&1)) {
-    cur->regmap[preferred_reg]=reg;
+    cur->regmap[preferred_reg]=tr;
     cur->dirty&=~(1<<preferred_reg);
     cur->isconst&=~(1<<preferred_reg);
     return;
   }
   if(r>=64&&((cur->uu>>(r&63))&1)) {
-    cur->regmap[preferred_reg]=reg;
+    cur->regmap[preferred_reg]=tr;
     cur->dirty&=~(1<<preferred_reg);
     cur->isconst&=~(1<<preferred_reg);
     return;
@@ -391,7 +391,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
   // We prefer these because they can do byte and halfword loads
   for(hr=0;hr<4;hr++) {
     if(cur->regmap[hr]==-1) {
-      cur->regmap[hr]=reg;
+      cur->regmap[hr]=tr;
       cur->dirty&=~(1<<hr);
       cur->isconst&=~(1<<hr);
       return;
@@ -425,7 +425,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
     for(hr=0;hr<HOST_REGS;hr++) {
       if(hr!=EXCLUDE_REG&&cur->regmap[hr]==-1) {
         if(regs[i-1].regmap[hr]!=rs1[i-1]&&regs[i-1].regmap[hr]!=rs2[i-1]&&regs[i-1].regmap[hr]!=rt1[i-1]&&regs[i-1].regmap[hr]!=rt2[i-1]) {
-          cur->regmap[hr]=reg;
+          cur->regmap[hr]=tr;
           cur->dirty&=~(1<<hr);
           cur->isconst&=~(1<<hr);
           return;
@@ -436,7 +436,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
   // Try to allocate any available register
   for(hr=0;hr<HOST_REGS;hr++) {
     if(hr!=EXCLUDE_REG&&cur->regmap[hr]==-1) {
-      cur->regmap[hr]=reg;
+      cur->regmap[hr]=tr;
       cur->dirty&=~(1<<hr);
       cur->isconst&=~(1<<hr);
       return;
@@ -467,7 +467,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
             cur->isconst&=~(1<<hr);
           }
         }
-        cur->regmap[preferred_reg]=reg;
+        cur->regmap[preferred_reg]=tr;
         return;
       }
       for(r=1;r<=MAXREG;r++)
@@ -476,7 +476,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
           for(hr=0;hr<HOST_REGS;hr++) {
             if(hr!=HOST_CCREG||j<hsn[CCREG]) {
               if(cur->regmap[hr]==r+64) {
-                cur->regmap[hr]=reg;
+                cur->regmap[hr]=tr;
                 cur->dirty&=~(1<<hr);
                 cur->isconst&=~(1<<hr);
                 return;
@@ -486,7 +486,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
           for(hr=0;hr<HOST_REGS;hr++) {
             if(hr!=HOST_CCREG||j<hsn[CCREG]) {
               if(cur->regmap[hr]==r) {
-                cur->regmap[hr]=reg;
+                cur->regmap[hr]=tr;
                 cur->dirty&=~(1<<hr);
                 cur->isconst&=~(1<<hr);
                 return;
@@ -504,7 +504,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
       if(hsn[r]==j) {
         for(hr=0;hr<HOST_REGS;hr++) {
           if(cur->regmap[hr]==r+64) {
-            cur->regmap[hr]=reg;
+            cur->regmap[hr]=tr;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -512,7 +512,7 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
         }
         for(hr=0;hr<HOST_REGS;hr++) {
           if(cur->regmap[hr]==r) {
-            cur->regmap[hr]=reg;
+            cur->regmap[hr]=tr;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -524,42 +524,42 @@ static void alloc_reg(struct regstat *cur,int i,signed char reg)
   DebugMessage(M64MSG_ERROR, "This shouldn't happen (alloc_reg)");exit(1);
 }
 
-static void alloc_reg64(struct regstat *cur,int i,signed char reg)
+static void alloc_reg64(struct regstat *cur,int i,signed char tr)
 {
-  int preferred_reg = 5+reg%3;
+  int preferred_reg = 5+tr%3;
   int r,hr;
   
   // allocate the lower 32 bits
-  alloc_reg(cur,i,reg);
+  alloc_reg(cur,i,tr);
   
   // Don't allocate unused registers
-  if((cur->uu>>reg)&1) return;
+  if((cur->uu>>tr)&1) return;
   
   // see if the upper half is already allocated
   for(hr=0;hr<HOST_REGS;hr++)
   {
-    if(cur->regmap[hr]==reg+64) return;
+    if(cur->regmap[hr]==tr+64) return;
   }
   
   // Keep the same mapping if the register was already allocated in a loop
-  preferred_reg = loop_reg(i,reg,preferred_reg);
+  preferred_reg = loop_reg(i,tr,preferred_reg);
   
   // Try to allocate the preferred register
   if(cur->regmap[preferred_reg]==-1) {
-    cur->regmap[preferred_reg]=reg|64;
+    cur->regmap[preferred_reg]=tr|64;
     cur->dirty&=~(1<<preferred_reg);
     cur->isconst&=~(1<<preferred_reg);
     return;
   }
   r=cur->regmap[preferred_reg];
   if(r<64&&((cur->u>>r)&1)) {
-    cur->regmap[preferred_reg]=reg|64;
+    cur->regmap[preferred_reg]=tr|64;
     cur->dirty&=~(1<<preferred_reg);
     cur->isconst&=~(1<<preferred_reg);
     return;
   }
   if(r>=64&&((cur->uu>>(r&63))&1)) {
-    cur->regmap[preferred_reg]=reg|64;
+    cur->regmap[preferred_reg]=tr|64;
     cur->dirty&=~(1<<preferred_reg);
     cur->isconst&=~(1<<preferred_reg);
     return;
@@ -568,7 +568,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
   // Try to allocate EBP, ESI or EDI
   for(hr=5;hr<8;hr++) {
     if(cur->regmap[hr]==-1) {
-      cur->regmap[hr]=reg|64;
+      cur->regmap[hr]=tr|64;
       cur->dirty&=~(1<<hr);
       cur->isconst&=~(1<<hr);
       return;
@@ -600,7 +600,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
     for(hr=0;hr<HOST_REGS;hr++) {
       if(hr!=EXCLUDE_REG&&cur->regmap[hr]==-1) {
         if(regs[i-1].regmap[hr]!=rs1[i-1]&&regs[i-1].regmap[hr]!=rs2[i-1]&&regs[i-1].regmap[hr]!=rt1[i-1]&&regs[i-1].regmap[hr]!=rt2[i-1]) {
-          cur->regmap[hr]=reg|64;
+          cur->regmap[hr]=tr|64;
           cur->dirty&=~(1<<hr);
           cur->isconst&=~(1<<hr);
           return;
@@ -611,7 +611,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
   // Try to allocate any available register
   for(hr=0;hr<HOST_REGS;hr++) {
     if(hr!=EXCLUDE_REG&&cur->regmap[hr]==-1) {
-      cur->regmap[hr]=reg|64;
+      cur->regmap[hr]=tr|64;
       cur->dirty&=~(1<<hr);
       cur->isconst&=~(1<<hr);
       return;
@@ -643,7 +643,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
             cur->isconst&=~(1<<hr);
           }
         }
-        cur->regmap[preferred_reg]=reg|64;
+        cur->regmap[preferred_reg]=tr|64;
         return;
       }
       for(r=1;r<=MAXREG;r++)
@@ -652,7 +652,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
           for(hr=0;hr<HOST_REGS;hr++) {
             if(hr!=HOST_CCREG||j<hsn[CCREG]) {
               if(cur->regmap[hr]==r+64) {
-                cur->regmap[hr]=reg|64;
+                cur->regmap[hr]=tr|64;
                 cur->dirty&=~(1<<hr);
                 cur->isconst&=~(1<<hr);
                 return;
@@ -662,7 +662,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
           for(hr=0;hr<HOST_REGS;hr++) {
             if(hr!=HOST_CCREG||j<hsn[CCREG]) {
               if(cur->regmap[hr]==r) {
-                cur->regmap[hr]=reg|64;
+                cur->regmap[hr]=tr|64;
                 cur->dirty&=~(1<<hr);
                 cur->isconst&=~(1<<hr);
                 return;
@@ -680,7 +680,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
       if(hsn[r]==j) {
         for(hr=0;hr<HOST_REGS;hr++) {
           if(cur->regmap[hr]==r+64) {
-            cur->regmap[hr]=reg|64;
+            cur->regmap[hr]=tr|64;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -688,7 +688,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
         }
         for(hr=0;hr<HOST_REGS;hr++) {
           if(cur->regmap[hr]==r) {
-            cur->regmap[hr]=reg|64;
+            cur->regmap[hr]=tr|64;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -703,7 +703,7 @@ static void alloc_reg64(struct regstat *cur,int i,signed char reg)
 // Allocate a temporary register.  This is done without regard to
 // dirty status or whether the register we request is on the unneeded list
 // Note: This will only allocate one register, even if called multiple times
-static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
+static void alloc_reg_temp(struct regstat *cur,int i,signed char tr)
 {
   int r,hr;
   int preferred_reg = -1;
@@ -711,14 +711,14 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
   // see if it's already allocated
   for(hr=0;hr<HOST_REGS;hr++)
   {
-    if(hr!=EXCLUDE_REG&&cur->regmap[hr]==reg) return;
+    if(hr!=EXCLUDE_REG&&cur->regmap[hr]==tr) return;
   }
   
   // Try to allocate any available register, starting with EDI, ESI, EBP...
   // We prefer EDI, ESI, EBP since the others are used for byte/halfword stores
   for(hr=HOST_REGS-1;hr>=0;hr--) {
     if(hr!=EXCLUDE_REG&&cur->regmap[hr]==-1) {
-      cur->regmap[hr]=reg;
+      cur->regmap[hr]=tr;
       cur->dirty&=~(1<<hr);
       cur->isconst&=~(1<<hr);
       return;
@@ -733,7 +733,7 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
       if(r<64) {
         if((cur->u>>r)&1) {
           if(i==0||((unneeded_reg[i-1]>>r)&1)) {
-            cur->regmap[hr]=reg;
+            cur->regmap[hr]=tr;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -744,7 +744,7 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
       {
         if((cur->uu>>(r&63))&1) {
           if(i==0||((unneeded_reg_upper[i-1]>>(r&63))&1)) {
-            cur->regmap[hr]=reg;
+            cur->regmap[hr]=tr;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -776,7 +776,7 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
           for(hr=0;hr<HOST_REGS;hr++) {
             if(hr!=HOST_CCREG||hsn[CCREG]>2) {
               if(cur->regmap[hr]==r+64) {
-                cur->regmap[hr]=reg;
+                cur->regmap[hr]=tr;
                 cur->dirty&=~(1<<hr);
                 cur->isconst&=~(1<<hr);
                 return;
@@ -786,7 +786,7 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
           for(hr=0;hr<HOST_REGS;hr++) {
             if(hr!=HOST_CCREG||hsn[CCREG]>2) {
               if(cur->regmap[hr]==r) {
-                cur->regmap[hr]=reg;
+                cur->regmap[hr]=tr;
                 cur->dirty&=~(1<<hr);
                 cur->isconst&=~(1<<hr);
                 return;
@@ -804,7 +804,7 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
       if(hsn[r]==j) {
         for(hr=0;hr<HOST_REGS;hr++) {
           if(cur->regmap[hr]==r+64) {
-            cur->regmap[hr]=reg;
+            cur->regmap[hr]=tr;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -812,7 +812,7 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
         }
         for(hr=0;hr<HOST_REGS;hr++) {
           if(cur->regmap[hr]==r) {
-            cur->regmap[hr]=reg;
+            cur->regmap[hr]=tr;
             cur->dirty&=~(1<<hr);
             cur->isconst&=~(1<<hr);
             return;
@@ -824,7 +824,7 @@ static void alloc_reg_temp(struct regstat *cur,int i,signed char reg)
   DebugMessage(M64MSG_ERROR, "This shouldn't happen");exit(1);
 }
 // Allocate a specific x86 register.
-static void alloc_x86_reg(struct regstat *cur,int i,signed char reg,int hr)
+static void alloc_x86_reg(struct regstat *cur,int i,signed char tr,int hr)
 {
   int n;
   int dirty=0;
@@ -832,13 +832,13 @@ static void alloc_x86_reg(struct regstat *cur,int i,signed char reg,int hr)
   // see if it's already allocated (and dealloc it)
   for(n=0;n<HOST_REGS;n++)
   {
-    if(n!=ESP&&cur->regmap[n]==reg) {
+    if(n!=ESP&&cur->regmap[n]==tr) {
       dirty=(cur->dirty>>n)&1;
       cur->regmap[n]=-1;
     }
   }
   
-  cur->regmap[hr]=reg;
+  cur->regmap[hr]=tr;
   cur->dirty&=~(1<<hr);
   cur->dirty|=dirty<<hr;
   cur->isconst&=~(1<<hr);
@@ -1918,12 +1918,12 @@ static void emit_pushmem(int addr)
   output_modrm(0,5,6);
   output_w32(addr);
 }
-static void emit_pusha()
+static void emit_pusha(void)
 {
   assem_debug("pusha");
   output_byte(0x60);
 }
-static void emit_popa()
+static void emit_popa(void)
 {
   assem_debug("popa");
   output_byte(0x61);
@@ -2430,7 +2430,7 @@ static void emit_idiv(int rs)
   output_byte(0xF7);
   output_modrm(3,rs,7);
 }
-static void emit_cdq()
+static void emit_cdq(void)
 {
   assem_debug("cdq");
   output_byte(0x99);
@@ -2529,19 +2529,19 @@ static void emit_fucomip(u_int r)
   output_byte(0xdf);
   output_byte(0xe8+r);
 }
-static void emit_fchs()
+static void emit_fchs(void)
 {
   assem_debug("fchs");
   output_byte(0xd9);
   output_byte(0xe0);
 }
-static void emit_fabs()
+static void emit_fabs(void)
 {
   assem_debug("fabs");
   output_byte(0xd9);
   output_byte(0xe1);
 }
-static void emit_fsqrt()
+static void emit_fsqrt(void)
 {
   assem_debug("fsqrt");
   output_byte(0xd9);
@@ -2627,7 +2627,7 @@ static void emit_fdiv(int r)
   output_byte(0xd8);
   output_byte(0xf0+r);
 }
-static void emit_fpop()
+static void emit_fpop(void)
 {
   // fstp st(0)
   assem_debug("fpop");
@@ -2676,14 +2676,14 @@ static void emit_fstpl(int r)
   if(r!=EBP) output_modrm(0,r,3);
   else {output_modrm(1,EBP,3);output_byte(0);}
 }
-static void emit_fnstcw_stack()
+static void emit_fnstcw_stack(void)
 {
   assem_debug("fnstcw (%%esp)");
   output_byte(0xd9);
   output_modrm(0,4,7);
   output_sib(0,4,4);
 }
-static void emit_fldcw_stack()
+static void emit_fldcw_stack(void)
 {
   assem_debug("fldcw (%%esp)");
   output_byte(0xd9);
@@ -3197,7 +3197,7 @@ static int do_dirty_stub(int i)
   return entry;
 }
 
-static void do_dirty_stub_ds()
+static void do_dirty_stub_ds(void)
 {
   emit_pushimm(start+1);
   emit_movimm((int)start<(int)0xC0000000?(int)source:(int)start,EAX);
@@ -3299,9 +3299,20 @@ static void gen_tlb_addr_w(int ar, int map) {
 }
 
 // We don't need this for x86
-static void generate_map_const(u_int addr,int reg) {
+static void generate_map_const(u_int addr,int tr) {
   // void *mapaddr=memory_map+(addr>>12);
 }
+
+#ifdef NEW_DYNAREC_DEBUG
+static void do_print_pc(int prog_cpt) {
+  emit_pusha();
+  emit_movimm(prog_cpt,EAX);
+  emit_pushreg(EAX);
+  emit_call((intptr_t)print_pc);
+  emit_popreg(EAX);
+  emit_popa();
+}
+#endif
 
 /* Special assem */
 
@@ -4612,4 +4623,4 @@ static void literal_pool(int n) {}
 static void literal_pool_jumpover(int n) {}
 
 // CPU-architecture-specific initialization, not needed for x86
-static void arch_init() {}
+static void arch_init(void) {}

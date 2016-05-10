@@ -64,6 +64,9 @@
     <Filter Include="r4300\new_dynarec\arm">
       <UniqueIdentifier>{873c3262-2472-407c-8451-67cbb5f78bae}</UniqueIdentifier>
     </Filter>
+    <Filter Include="r4300\new_dynarec\arm64">
+      <UniqueIdentifier>{f33aa1db-255e-43fe-8a8e-36ab0bc0735a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\ai\ai_controller.c">
@@ -402,6 +405,12 @@
     <ClCompile Include="..\..\src\debugger\dbg_memory.c">
       <Filter>debugger</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\r4300\new_dynarec\profiler.c">
+      <Filter>r4300\new_dynarec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\r4300\new_dynarec\arm64\assem_arm64.c">
+      <Filter>r4300\new_dynarec\arm64</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\ai\ai_controller.h">
@@ -725,6 +734,18 @@
     <ClInclude Include="..\..\src\debugger\dbg_types.h">
       <Filter>debugger</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\r4300\new_dynarec\arm\arm_profiler.h">
+      <Filter>r4300\new_dynarec\arm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\r4300\new_dynarec\x86\x86_profiler.h">
+      <Filter>r4300\new_dynarec\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\r4300\new_dynarec\arm64\assem_arm64.h">
+      <Filter>r4300\new_dynarec\arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\r4300\new_dynarec\arm64\arm64_profiler.h">
+      <Filter>r4300\new_dynarec\arm64</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\r4300\interpreter.def">
@@ -750,6 +771,9 @@
     </None>
     <None Include="..\..\src\r4300\new_dynarec\arm\linkage_arm.S">
       <Filter>r4300\new_dynarec\arm</Filter>
+    </None>
+    <None Include="..\..\src\r4300\new_dynarec\arm64\linkage_arm64.S">
+      <Filter>r4300\new_dynarec\arm64</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

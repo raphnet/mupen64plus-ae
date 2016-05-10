@@ -22,6 +22,7 @@
 #include <SDL_config.h>
 #include <SDL_surface.h>
 
+#ifndef SDL_VIDEO_DRIVER_DUMMY
 #ifndef USE_GLES
 
 #ifndef SDL_VIDEO_OPENGL
@@ -35,6 +36,7 @@
 #endif
 
 #endif // !USE_GLES
+#endif
 
 typedef struct SDL_VideoInfo
 {

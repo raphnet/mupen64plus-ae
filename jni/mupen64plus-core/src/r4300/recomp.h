@@ -24,7 +24,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__aarch64__)
   #include "x86_64/assemble_struct.h"
 #else
   #include "x86/assemble_struct.h"
@@ -100,7 +100,7 @@ extern precomp_instr *dst; /* precomp_instr structure for instruction being reco
 
 extern int no_compiled_jump;
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__aarch64__)
   #include "x86_64/assemble.h"
   #include "x86_64/regcache.h"
 #else

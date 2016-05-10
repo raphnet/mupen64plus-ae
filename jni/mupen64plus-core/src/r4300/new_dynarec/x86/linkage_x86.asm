@@ -360,25 +360,27 @@ jump_vaddr_edi:
     mov     eax,    edi
 
 jump_vaddr:
-    ;Check hash table
-    shr     eax,    16
-    xor     eax,    edi
-    movzx   eax,    ax
-    shl     eax,    4
-    cmp     edi,    [hash_table+eax]
-    jne     _C2
-_C1:
-    mov     edi,    [hash_table+4+eax]
-    jmp     edi
-_C2:
-    cmp     edi,    [hash_table+8+eax]
-    lea     eax,    [8+eax]
-    je      _C1
-    ;No hit on hash table, call compiler
+;    Check hash table
+;    shr     eax,    16
+;    xor     eax,    edi
+;    movzx   eax,    ax
+;    shl     eax,    4
+;    cmp     edi,    [hash_table+eax]
+;    jne     _C2
+;_C1:
+;    mov     edi,    [hash_table+4+eax]
+;    jmp     edi
+;_C2:
+;    cmp     edi,    [hash_table+8+eax]
+;    lea     eax,    [8+eax]
+;    je      _C1
+;    ;No hit on hash table, call compiler
     add     esp,    -12
     push    edi
     mov     [cycle_count],    esi    ;CCREG
-    call    get_addr
+    add     esi,    [last_count]
+    mov     [g_cp0_regs+36],    esi    ;Count
+    call    get_addr_ht
     mov     esi,    [cycle_count]
     add     esp,    16
     jmp     eax

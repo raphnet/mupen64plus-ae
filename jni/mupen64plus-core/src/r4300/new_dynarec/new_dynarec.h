@@ -28,15 +28,10 @@
 #define NEW_DYNAREC_X86 1
 #define NEW_DYNAREC_AMD64 2
 #define NEW_DYNAREC_ARM 3
+#define NEW_DYNAREC_ARM64 4
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 extern int pcaddr;
 extern int pending_exception;
-#ifdef __cplusplus
-}
-#endif
 
 void invalidate_all_pages(void);
 void invalidate_block(unsigned int block);
