@@ -14,8 +14,8 @@ COMMON_CFLAGS :=                    \
     -fno-strict-aliasing            \
     -fomit-frame-pointer            \
     -frename-registers              \
-    -fsingle-precision-constant     \
-    -fvisibility=hidden             \
+    -fvisibility=hidden
+
 
 COMMON_CPPFLAGS :=                  \
     -fvisibility-inlines-hidden     \

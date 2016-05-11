@@ -71,7 +71,6 @@ LOCAL_SRC_FILES :=                              \
     $(SRCDIR)/r4300/recomp.c                    \
     $(SRCDIR)/r4300/reset.c                     \
     $(SRCDIR)/r4300/tlb.c                       \
-    $(SRCDIR)/r4300/new_dynarec/new_dynarec.c   \
     $(SRCDIR)/rdp/fb.c                          \
     $(SRCDIR)/rdp/rdp_core.c                    \
     $(SRCDIR)/ri/rdram.c                        \
@@ -108,6 +107,7 @@ LOCAL_LDFLAGS :=                                                    \
 
 ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
     # Use for ARM7a:
+    LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/new_dynarec.c
     LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/arm/linkage_arm.S
     LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/arm/arm_cpu_features.c
     LOCAL_CFLAGS += -DDYNAREC
@@ -117,15 +117,24 @@ ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
 
 else ifeq ($(TARGET_ARCH_ABI), armeabi)
     # Use for pre-ARM7a:
+    LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/new_dynarec.c
     LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/arm/linkage_arm.S
     LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/arm/arm_cpu_features.c
     LOCAL_CFLAGS += -DARMv5_ONLY
     LOCAL_CFLAGS += -DDYNAREC
     LOCAL_CFLAGS += -DNEW_DYNAREC=3
 
+else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
+    # Use for ARMv8a:
+    LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/new_dynarec_64.c
+    LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/arm64/linkage_arm64.S
+    LOCAL_CFLAGS += -DDYNAREC
+    LOCAL_CFLAGS += -DNEW_DYNAREC=4
+
 else ifeq ($(TARGET_ARCH_ABI), x86)
     # Use for x86:
     LOCAL_ASMFLAGS = -d ELF_TYPE
+    LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/new_dynarec.c
     LOCAL_SRC_FILES += $(SRCDIR)/r4300/new_dynarec/x86/linkage_x86.asm
     LOCAL_CFLAGS += -DDYNAREC
     LOCAL_CFLAGS += -DNEW_DYNAREC=1
@@ -147,6 +156,7 @@ else ifeq ($(TARGET_ARCH_ABI), x86)
     LOCAL_STATIC_LIBRARIES := $(SAVED_STATIC_LIBRARIES)
     LOCAL_C_INCLUDES := $(SAVED_C_INCLUDES)
     LOCAL_MODULE := mupen64plus-core-pic
+
 
     LOCAL_SRC_FILES := $(filter-out $(SRCDIR)/r4300/empty_dynarec.c \
             $(SRCDIR)/r4300/new_dynarec/new_dynarec.c \
@@ -172,7 +182,7 @@ else ifeq ($(TARGET_ARCH_ABI), x86)
 
 else ifeq ($(TARGET_ARCH_ABI), mips)
     # Use for MIPS:
-    #TODO: Possible to port dynarec from Daedalus? 
+    #TODO: Possible to port dynarec from Daedalus?
 
 else
     # Any other architectures that Android could be running on?

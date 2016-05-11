@@ -85,9 +85,10 @@ ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
     #MY_LOCAL_SRC_FILES += 3DMathNeon.cpp.neon 
     MY_LOCAL_CFLAGS += -DARM_ASM
     MY_LOCAL_CFLAGS += -D__NEON_OPT
-    
-else ifeq ($(TARGET_ARCH_ABI), armeabi)
-    # Use for pre-ARM7a:
+
+else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
+    MY_LOCAL_CFLAGS += -DARM_ASM
+    MY_LOCAL_CFLAGS += -D__NEON_OPT
     
 else ifeq ($(TARGET_ARCH_ABI), x86)
     # TODO: set the proper flags here
@@ -131,6 +132,8 @@ LOCAL_LDFLAGS           := $(MY_LOCAL_LDFLAGS)
 
 ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
     LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm/ -lGLESv3
+else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
+    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm64/ -lGLESv3
 else ifeq ($(TARGET_ARCH_ABI), x86)
     LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/x86/ -lGLESv3
 else
@@ -154,6 +157,8 @@ LOCAL_CPPFLAGS          := $(MY_LOCAL_CPPFLAGS)
 LOCAL_LDFLAGS           := $(MY_LOCAL_LDFLAGS)
 
 ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
+    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm/ -lGLESv3
+else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
     LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm/ -lGLESv3
 else ifeq ($(TARGET_ARCH_ABI), x86)
     LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/x86/ -lGLESv3

@@ -55,6 +55,8 @@ LOCAL_CFLAGS := $(MY_LOCAL_CFLAGS) -DFP_ENABLED
 
 ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
     LOCAL_LDLIBS        += -lOpenSLES -L$(LOCAL_PATH)/../SLES/lib/arm/ -llog 
+else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
+    LOCAL_LDLIBS        += -lOpenSLES -L$(LOCAL_PATH)/../SLES/lib/arm/ -llog
 else ifeq ($(TARGET_ARCH_ABI), x86)
     LOCAL_LDLIBS        += -lOpenSLES -L$(LOCAL_PATH)/../SLES/lib/x86/ -llog
 endif
