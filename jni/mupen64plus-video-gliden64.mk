@@ -159,7 +159,7 @@ LOCAL_LDFLAGS           := $(MY_LOCAL_LDFLAGS)
 ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
     LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm/ -lGLESv3
 else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
-    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm/ -lGLESv3
+    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm64/ -lGLESv3
 else ifeq ($(TARGET_ARCH_ABI), x86)
     LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/x86/ -lGLESv3
 else
