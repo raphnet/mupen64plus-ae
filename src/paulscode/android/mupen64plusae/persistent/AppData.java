@@ -338,7 +338,7 @@ public class AppData
     
     private boolean libraryExists( String undecoratedName )
     {
-        File library = new File( libsDir + "lib" + undecoratedName + ".so" );
+        File library = new File( libsDir + "/lib" + undecoratedName + ".so" );
         return library.exists();
     }
     
