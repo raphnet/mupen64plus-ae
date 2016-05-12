@@ -11078,7 +11078,7 @@ int new_recompile_block(int addr)
     out=(u_char *)base_addr;
   
   // Trap writes to any of the pages we compiled
-  for(i=start>>12;i<=(int)((start+slen*4)>>12);i++) {
+  for(i=start>>12;i<=(int)((start+slen*4-4)>>12);i++) {
     invalid_code[i]=0;
     memory_map[i]|=WRITE_PROTECT;
     if((signed int)start>=(signed int)0xC0000000) {

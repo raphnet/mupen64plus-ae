@@ -816,7 +816,56 @@ LOCAL_FUNCTION(tlb_exception):
     /* w1 = cause */
     /* w2 = address */
     /* w3 = instr addr/flags */
-    brk 0
+    ldr    w4, [x29, #g_cp0_regs+48-dynarec_local] /* Status */
+    add    x5, x29, #memory_map-dynarec_local
+    lsr    w6, w3, #12
+    orr    w1, w1, w3, lsl #31
+    orr    w4, w4, #2
+    ldr    x7, [x5, x6, lsl #3]
+    bic    w8, w3, #3
+    str    w4, [x29, #g_cp0_regs+48-dynarec_local] /* Status */
+    mov    w6, #0x6000000
+    movk   w6, #0x22
+    str    w1, [x29, #g_cp0_regs+52-dynarec_local] /* Cause */
+    ldr    w0, [x8, x7, lsl #2]
+    add    w4, w8, w1, asr #29
+    add    x5, x29, #reg-dynarec_local
+    str    w4, [x29, #g_cp0_regs+56-dynarec_local] /* EPC */
+    mov    w7, #0xf8
+    ldr    w8, [x29, #g_cp0_regs+16-dynarec_local] /* Context */
+    lsl    w1, w0, #16
+    lsr    w4, w0, #26
+    and    w4, w4, #31
+    and    w7, w7, w0, lsr #18
+    mov    w9, #0x0FFFFFF0
+    sub    w2, w2, w1, asr #16
+    bic    w9, w9, #0x0F800000
+    ror    w6, w6, w4
+    mov    w0, #0x80000000
+    tst    w6, w0
+    b.eq   .G1
+    ldr    w2, [x5, x7]
+.G1:
+    bic    w8, w8, w9
+    tst    w3, #2
+    str    w2, [x5, x7]
+    add    w4, w2, w1, asr #16
+    add    x6, x29, #reg+4-dynarec_local
+    asr    w3, w2, #31
+    str    w4, [x29, #g_cp0_regs+32-dynarec_local] /* BadVAddr */
+    add    w0, w0, #0x180
+    and    w4, w9, w4, lsr #9
+    b.eq   .G2
+    str    w3, [x6, x7]
+.G2:
+    orr    w8, w8, w4
+    str    w8, [x29, #g_cp0_regs+16-dynarec_local] /* Context */
+    bl     get_addr_ht
+    ldr    w1, [x29, #next_interupt-dynarec_local]
+    ldr    w20, [x29, #g_cp0_regs+36-dynarec_local] /* Count */
+    str    w1, [x29, #last_count-dynarec_local]
+    sub    w20, w20, w1
+    br     x0
     
 GLOBAL_FUNCTION(breakpoint):
     brk 0

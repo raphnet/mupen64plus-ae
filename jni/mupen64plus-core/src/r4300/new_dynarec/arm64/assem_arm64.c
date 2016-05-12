@@ -402,8 +402,6 @@ static void *dynamic_linker(void * src, u_int vaddr)
 
 static void *dynamic_linker_ds(void * src, u_int vaddr)
 {
-  //TOBEDONE: Find test case
-  assert(0);
   u_int page=(vaddr^0x80000000)>>12;
   u_int vpage=page;
   if(page>262143&&tlb_LUT_r[vaddr>>12]) page=(tlb_LUT_r[vaddr>>12]^0x80000000)>>12;
@@ -4067,22 +4065,19 @@ static intptr_t do_dirty_stub(int i)
 
 static void do_dirty_stub_ds(void)
 {
-  //TOBEDONE
-  assert(0);
   // Careful about the code output here, verify_dirty and get_bounds needs to parse it.
-  /*#ifdef ARMv5_ONLY
-  emit_loadlp((int)start<(int)0xC0000000?(int)source:(int)start,1);
-  emit_loadlp((int)copy,2);
-  emit_loadlp(slen*4,3);
-  #else
-  emit_movw(((int)start<(int)0xC0000000?(u_int)source:(u_int)start)&0x0000FFFF,1);
-  emit_movw(((u_int)copy)&0x0000FFFF,2);
-  emit_movt(((int)start<(int)0xC0000000?(u_int)source:(u_int)start)&0xFFFF0000,1);
-  emit_movt(((u_int)copy)&0xFFFF0000,2);
-  emit_movw(slen*4,3);
-  #endif
+  if((int)start<(int)0xC0000000){
+    emit_read_ptr((intptr_t)source,1);
+  }else{
+    emit_movz_lsl16(((u_int)start>>16)&0xffff,1);
+    emit_movk(((u_int)start)&0xffff,1);
+  }
+
+  emit_read_ptr((intptr_t)copy,2);
+
+  emit_movz(slen*4,3);
   emit_movimm(start+1,0);
-  emit_call((int)&verify_code_ds);*/
+  emit_call((intptr_t)&verify_code_ds);
 }
 
 static void do_cop1stub(int n)
