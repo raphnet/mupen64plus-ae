@@ -114,8 +114,6 @@ LOCAL_LDFLAGS           := $(MY_LOCAL_LDFLAGS)
 LOCAL_LDLIBS            := $(MY_LOCAL_LDLIBS) -lGLESv2
 include $(BUILD_SHARED_LIBRARY)
 
-ifneq ($(TARGET_ARCH_ABI), armeabi)
-
 ###########
 # gles 3.0
 ###########
@@ -129,17 +127,7 @@ LOCAL_SRC_FILES         := $(MY_LOCAL_SRC_FILES) $(SRCDIR)/OGL3X/UniformBlock.cp
 LOCAL_CFLAGS            := $(MY_LOCAL_CFLAGS) -DGLES3
 LOCAL_CPPFLAGS          := $(MY_LOCAL_CPPFLAGS)
 LOCAL_LDFLAGS           := $(MY_LOCAL_LDFLAGS)
-
-ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
-    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm/ -lGLESv3
-else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
-    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm64/ -lGLESv3
-else ifeq ($(TARGET_ARCH_ABI), x86)
-    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/x86/ -lGLESv3
-else
-    # Any other architectures that Android could be running on?
-endif
-
+LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/$(TARGET_ARCH_ABI)/ -lGLESv3
 include $(BUILD_SHARED_LIBRARY)
 
 ###########
@@ -155,17 +143,5 @@ LOCAL_SRC_FILES         := $(MY_LOCAL_SRC_FILES) $(SRCDIR)/OGL3X/UniformBlock.cp
 LOCAL_CFLAGS            := $(MY_LOCAL_CFLAGS) -DGLES3_1
 LOCAL_CPPFLAGS          := $(MY_LOCAL_CPPFLAGS)
 LOCAL_LDFLAGS           := $(MY_LOCAL_LDFLAGS)
-
-ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
-    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm/ -lGLESv3
-else ifeq ($(TARGET_ARCH_ABI), arm64-v8a)
-    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/arm64/ -lGLESv3
-else ifeq ($(TARGET_ARCH_ABI), x86)
-    LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/x86/ -lGLESv3
-else
-    # Any other architectures that Android could be running on?
-endif
-
+LOCAL_LDLIBS        := $(MY_LOCAL_LDLIBS) -L$(LOCAL_PATH)/GLES3/lib/$(TARGET_ARCH_ABI)/ -lGLESv3
 include $(BUILD_SHARED_LIBRARY)
-
-endif #not armebi
