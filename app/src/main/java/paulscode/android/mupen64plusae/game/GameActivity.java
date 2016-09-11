@@ -50,7 +50,11 @@ import com.bda.controller.Controller;
 import org.mupen64plusae.v3.alpha.R;
 
 import java.io.File;
+import java.io.FileFilter;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 import paulscode.android.mupen64plusae.ActivityHelper;
 import paulscode.android.mupen64plusae.DrawerDrawable;
@@ -84,6 +88,7 @@ import paulscode.android.mupen64plusae.persistent.GamePrefs;
 import paulscode.android.mupen64plusae.persistent.GlobalPrefs;
 import paulscode.android.mupen64plusae.persistent.GlobalPrefs.PakType;
 import paulscode.android.mupen64plusae.profile.ControllerProfile;
+import paulscode.android.mupen64plusae.util.FileUtil;
 import paulscode.android.mupen64plusae.util.RomDatabase;
 import paulscode.android.mupen64plusae.util.RomDatabase.RomDetail;
 import paulscode.android.mupen64plusae.util.RomHeader;
@@ -151,6 +156,7 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
     private boolean mIsSurface = false;     // true if the surface is available
 
     // App data and user preferences
+    private AppData mAppData;
     private GlobalPrefs mGlobalPrefs;
     private GamePrefs mGamePrefs;
     private GameAutoSaveManager mAutoSaveManager;
@@ -167,8 +173,8 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
         //Allow volume keys to control media volume if they are not mapped
         final SharedPreferences mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         final boolean volKeyMapped = mPreferences.getBoolean("inputVolumeMappable", false);
-        final AppData appData = new AppData( this );
-        final GlobalPrefs globalPrefs = new GlobalPrefs(this, appData);
+        mAppData = new AppData( this );
+        final GlobalPrefs globalPrefs = new GlobalPrefs(this, mAppData);
         if (!volKeyMapped && globalPrefs.audioPlugin.enabled)
         {
             setVolumeControlStream(AudioManager.STREAM_MUSIC);
@@ -199,10 +205,10 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
         MogaHack.init( mMogaController, this );
 
         // Get app data and user preferences
-        mGlobalPrefs = new GlobalPrefs( this, appData );
+        mGlobalPrefs = new GlobalPrefs( this, mAppData );
 
         mGamePrefs = new GamePrefs( this, mRomMd5, mRomCrc, romHeaderName, romGoodName,
-            RomHeader.countryCodeToSymbol(romCountryCode), appData, mGlobalPrefs, legacySaveName );
+            RomHeader.countryCodeToSymbol(romCountryCode), mAppData, mGlobalPrefs, legacySaveName );
         String cheatArgs =  mGamePrefs.getCheatArgs();
 
         mAutoSaveManager = new GameAutoSaveManager(mGamePrefs, mGlobalPrefs.maxAutoSaves);
@@ -222,9 +228,9 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
         this.setRequestedOrientation( mGlobalPrefs.displayOrientation );
 
         // If the orientation changes, the screensize info changes, so we must refresh dependencies
-        mGlobalPrefs = new GlobalPrefs( this, appData );
+        mGlobalPrefs = new GlobalPrefs( this, mAppData );
         mGamePrefs = new GamePrefs( this, mRomMd5, mRomCrc, romHeaderName, romGoodName,
-                RomHeader.countryCodeToSymbol(romCountryCode), appData, mGlobalPrefs, legacySaveName );
+                RomHeader.countryCodeToSymbol(romCountryCode), mAppData, mGlobalPrefs, legacySaveName );
 
         mFirstStart = true;
 
@@ -260,6 +266,8 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
             mGameSidebar.setImage(new BitmapDrawable(this.getResources(), artPath));
 
         mGameSidebar.setTitle(romGoodName);
+
+        setupDirectories();
         // Initialize the objects and data files interfacing to the emulator core
         CoreInterface.initialize( this, mSurface, mGamePrefs, mRomPath, cheatArgs, doRestart,
                 AppData.getOpenGlEsVersion(this) );
@@ -436,6 +444,159 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
         CoreInterface.onPromptDialogClosed(id, which);
     }
 
+    private void setupDirectories()
+    {
+        makeDirs();
+        moveFromLegacy();
+        copyGameData();
+    }
+
+    private void makeDirs()
+    {
+        // Make sure various directories exist so that we can write to them
+        FileUtil.makeDirs(mGamePrefs.sramDataDir);
+        FileUtil.makeDirs(mGamePrefs.autoSaveDir);
+        FileUtil.makeDirs(mGamePrefs.slotSaveDir);
+        FileUtil.makeDirs(mGamePrefs.userSaveDir);
+        FileUtil.makeDirs(mGamePrefs.screenshotDir);
+        FileUtil.makeDirs(mGamePrefs.coreUserConfigDir);
+        FileUtil.makeDirs(mGlobalPrefs.coreUserDataDir);
+        FileUtil.makeDirs(mGlobalPrefs.coreUserCacheDir);
+    }
+
+    private void copyGameData()
+    {
+        String gameDataDir = mAppData.runTimeGameDataDir;
+
+        FileUtil.deleteFolder(new File(gameDataDir));
+        FileUtil.makeDirs(gameDataDir);
+        FileUtil.copyFile(new File(mGamePrefs.coreUserConfigDir),
+                new File(gameDataDir + "/" + GamePrefs.CORE_CONFIG_DIR));
+        FileUtil.copyFile(new File(mGamePrefs.sramDataDir),
+                new File(gameDataDir + "/" + GamePrefs.SRAM_DATA_DIR));
+
+        //Create any directories that were not created with the above operation
+        FileUtil.makeDirs(gameDataDir + "/" + GamePrefs.SRAM_DATA_DIR);
+        FileUtil.makeDirs(gameDataDir + "/" + GamePrefs.SLOT_SAVES_DIR);
+        FileUtil.makeDirs(gameDataDir + "/" + GamePrefs.USER_SAVES_DIR);
+        FileUtil.makeDirs(gameDataDir + "/" + GamePrefs.SCREENSHOTS_DIR);
+        FileUtil.makeDirs(gameDataDir + "/" + GamePrefs.CORE_CONFIG_DIR);
+    }
+
+    /**
+     * Move any legacy files to new folder structure
+     */
+    private void moveFromLegacy()
+    {
+        final File legacySlotPath = new File(mGlobalPrefs.legacySlotSaves);
+        final File legacyAutoSavePath = new File(mGlobalPrefs.legacyAutoSaves);
+
+        if (legacySlotPath.listFiles() != null)
+        {
+            // Move sra, mpk, fla, and eep files
+            final FileFilter fileSramFilter = new FileFilter()
+            {
+
+                @Override
+                public boolean accept(File pathname)
+                {
+                    final String fileName = pathname.getName();
+
+                    return fileName.contains(mGamePrefs.gameGoodName + ".sra")
+                            || fileName.contains(mGamePrefs.gameGoodName + ".eep")
+                            || fileName.contains(mGamePrefs.gameGoodName + ".mpk")
+                            || fileName.contains(mGamePrefs.gameGoodName + ".fla");
+                }
+            };
+
+            // Move all files found
+            for (final File file : legacySlotPath.listFiles(fileSramFilter))
+            {
+                String targetPath = mGamePrefs.sramDataDir + "/" + file.getName();
+                File targetFile = new File(targetPath);
+
+                if (!targetFile.exists())
+                {
+                    Log.i("GameActivity", "Found legacy SRAM file: " + file + " Moving to " + targetFile.getPath());
+
+                    FileUtil.copyFile(file, targetFile);
+                }
+                else
+                {
+                    Log.i("GameActivity", "Found legacy SRAM file: " + file + " but can't move");
+                }
+            }
+
+            // Move all st files
+            final FileFilter fileSlotFilter = new FileFilter()
+            {
+
+                @Override
+                public boolean accept(File pathname)
+                {
+                    final String fileName = pathname.getName();
+                    return fileName.contains(mGamePrefs.gameGoodName)
+                            && fileName.substring(fileName.length() - 3).contains("st");
+                }
+            };
+
+            for (final File file : legacySlotPath.listFiles(fileSlotFilter))
+            {
+                String targetPath = mGamePrefs.slotSaveDir + "/" + file.getName();
+                File targetFile = new File(targetPath);
+
+                if (!targetFile.exists())
+                {
+                    Log.i("GameActivity", "Found legacy ST file: " + file + " Moving to " + targetFile.getPath());
+
+                    FileUtil.copyFile(file, targetFile);
+                }
+                else
+                {
+                    Log.i("GameActivity", "Found legacy ST file: " + file + " but can't move");
+                }
+            }
+        }
+
+        if(legacyAutoSavePath.listFiles() != null)
+        {
+            //Move auto saves
+            final FileFilter fileAutoSaveFilter = new FileFilter(){
+
+                @Override
+                public boolean accept(File pathname)
+                {
+                    final String fileName = pathname.getName();
+                    return fileName.equals(mGamePrefs.legacySaveFileName + ".sav");
+                }
+            };
+
+            //Move all files found
+            for( final File file : legacyAutoSavePath.listFiles(fileAutoSaveFilter) )
+            {
+                final DateFormat dateFormat = new SimpleDateFormat(GameAutoSaveManager.sFormatString, java.util.Locale.getDefault());
+                final String dateAndTime = dateFormat.format(new Date()).toString();
+                final String fileName = dateAndTime + ".sav";
+
+                String targetPath = mGamePrefs.autoSaveDir + "/" + fileName;
+                File targetFile= new File(targetPath);
+
+                if(!targetFile.exists())
+                {
+                    Log.i("GameActivity", "Found legacy SAV file: " + file +
+                            " Moving to " + targetFile.getPath());
+
+                    FileUtil.copyFile(file, targetFile);
+                }
+                else
+                {
+                    Log.i("GameActivity", "Found legacy SAV file: " + file +
+                            " but can't move");
+                }
+            }
+        }
+    }
+
     private void ReloadAllMenus()
     {
         //Reload currently selected speed setting
@@ -537,23 +698,19 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
             CoreInterface.setSlotFromPrompt(this);
             break;
         case R.id.menuItem_slot_load:
-            CoreInterface.loadSlot(this);
+            loadSlot();
             break;
         case R.id.menuItem_slot_save:
-            CoreInterface.saveSlot(this);
-            if( mDrawerLayout.isDrawerOpen( GravityCompat.START ) )
-            {
-                mDrawerLayout.closeDrawer( GravityCompat.START );
-            }
+            saveSlot();
             break;
         case R.id.menuItem_file_load:
-            CoreInterface.loadFileFromPrompt(this);
+            loadFile();
             break;
         case R.id.menuItem_file_save:
-            CoreInterface.saveFileFromPrompt();
+            saveFile();
             break;
         case R.id.menuItem_file_load_auto_save:
-            CoreInterface.loadAutoSaveFromPrompt(this);
+            loadAutoSave();
             break;
         case R.id.menuItem_disable_frame_limiter:
             CoreInterface.toggleFramelimiter();
@@ -592,6 +749,93 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
             break;
         default:
         }
+    }
+
+    private void saveSlot()
+    {
+        final String gameDataDir = mAppData.runTimeGameDataDir;
+        final String saveStatePath = gameDataDir + "/" + GamePrefs.SLOT_SAVES_DIR;
+        FileUtil.deleteFolder(new File(saveStatePath));
+        FileUtil.makeDirs(saveStatePath);
+
+        CoreInterface.addOnStateCallbackListener( new CoreInterface.OnStateCallbackListener()
+        {
+            @Override
+            public void onStateCallback( int paramChanged, int newValue )
+            {
+                if( paramChanged == NativeConstants.M64CORE_STATE_SAVECOMPLETE )
+                {
+                    CoreInterface.removeOnStateCallbackListener( this );
+
+                    //Copy game data back to storage
+                    FileUtil.copyFile(new File(saveStatePath), new File(mGamePrefs.slotSaveDir));
+                }
+            }
+        } );
+
+        CoreInterface.saveSlot();
+        onSaveLoad();
+    }
+
+    private void loadSlot()
+    {
+        String saveStateName = mGamePrefs.gameGoodName + ".st" + CoreInterface.getSetSlot();
+        //Copy game data from storage
+        String gameDataDir = mAppData.runTimeGameDataDir;
+        String saveStateSrcPath = mGamePrefs.slotSaveDir + "/" + saveStateName;
+        String saveStateDestPath = gameDataDir + "/" + GamePrefs.SLOT_SAVES_DIR + "/" + saveStateName;
+        FileUtil.copyFile(new File(saveStateSrcPath), new File(saveStateDestPath));
+
+        CoreInterface.loadSlot();
+        onSaveLoad();
+    }
+
+    private void saveFile()
+    {
+        final String gameDataDir = mAppData.runTimeGameDataDir;
+        final String saveStatePath = gameDataDir + "/" + GamePrefs.USER_SAVES_DIR;
+        FileUtil.deleteFolder(new File(saveStatePath));
+        FileUtil.makeDirs(saveStatePath);
+
+        CoreInterface.addOnStateCallbackListener( new CoreInterface.OnStateCallbackListener()
+        {
+            @Override
+            public void onStateCallback( int paramChanged, int newValue )
+            {
+                if( paramChanged == NativeConstants.M64CORE_STATE_SAVECOMPLETE )
+                {
+                    CoreInterface.removeOnStateCallbackListener( this );
+
+                    //Copy game data back to storage
+                    FileUtil.copyFile(new File(saveStatePath), new File(mGamePrefs.userSaveDir));
+                }
+            }
+        } );
+
+        CoreInterface.saveFileFromPrompt();
+    }
+
+    private void loadFile()
+    {
+        CoreInterface.loadFileFromPrompt(this);
+    }
+
+    @Override
+    public void onFileSelected(File file)
+    {
+        String saveStateName = file.getName();
+        //Copy game data from private storage
+        String gameDataDir = mAppData.runTimeGameDataDir;
+        String saveStateSrcPath = mGamePrefs.userSaveDir + "/" + saveStateName;
+        String saveStateDstPath = gameDataDir + "/" + GamePrefs.USER_SAVES_DIR;
+        FileUtil.copyFile(new File(saveStateSrcPath), new File(saveStateDstPath));
+
+        CoreInterface.loadState( file );
+    }
+
+    private void loadAutoSave()
+    {
+        CoreInterface.loadAutoSaveFromPrompt(this);
     }
 
     private CharSequence GetPlayerTextFromId(int playerId)
@@ -909,6 +1153,20 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
         return mIsResumed && mIsSurface;
     }
 
+    private String loadLatestAutoSave()
+    {
+        final String latestSave = mAutoSaveManager.getLatestAutoSave();
+        File file = new File(mAutoSaveManager.getLatestAutoSave());
+        String saveStateName = file.getName();
+        //Copy game data from private storage
+        String gameDataDir = mAppData.runTimeGameDataDir;
+        String saveStateSrcPath = mGamePrefs.autoSaveDir + "/" + saveStateName;
+        String saveStateDstPath = gameDataDir + "/" + GamePrefs.AUTO_SAVES_DIR;
+        FileUtil.copyFile(new File(saveStateSrcPath), new File(saveStateDstPath));
+
+        return saveStateDstPath + "/" + saveStateName;
+    }
+
     private void tryRunning()
     {
         final int state = NativeExports.emuGetState();
@@ -917,8 +1175,8 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
             switch( state )
             {
                 case NativeConstants.EMULATOR_STATE_UNKNOWN:
-                    final String latestSave = mAutoSaveManager.getLatestAutoSave();
-                    CoreInterface.startupEmulator(latestSave);
+
+                    CoreInterface.startupEmulator(loadLatestAutoSave());
                     break;
                 case NativeConstants.EMULATOR_STATE_PAUSED:
                     if( mSurface.isEGLContextReady() && !mDrawerLayout.isDrawerOpen( GravityCompat.START )
@@ -937,10 +1195,38 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
 
         if(CoreInterface.isCoreRunning())
         {
+            final String gameDataDir = mAppData.runTimeGameDataDir;
+            final String saveStatePath = gameDataDir + "/" + GamePrefs.AUTO_SAVES_DIR;
+            FileUtil.deleteFolder(new File(saveStatePath));
+            FileUtil.makeDirs(saveStatePath);
+
+            CoreInterface.addOnStateCallbackListener( new CoreInterface.OnStateCallbackListener()
+            {
+                @Override
+                public void onStateCallback( int paramChanged, int newValue )
+                {
+                    if( paramChanged == NativeConstants.M64CORE_STATE_SAVECOMPLETE )
+                    {
+                        CoreInterface.removeOnStateCallbackListener( this );
+
+                        //Copy game data back to storage
+                        FileUtil.copyFile(new File(saveStatePath), new File(mGamePrefs.autoSaveDir));
+                    }
+                }
+            } );
+
             //Generate auto save file
-            final String saveFileName = mAutoSaveManager.getAutoSaveFileName();
+            final String savePath = mAutoSaveManager.getAutoSaveFileName();
+            String saveFileName = new File(savePath).getName();
+            saveFileName = saveStatePath + "/" + saveFileName;
             CoreInterface.autoSaveState( saveFileName );
             mAutoSaveManager.clearOldest();
+
+            FileUtil.copyFile(new File(gameDataDir + "/" + GamePrefs.CORE_CONFIG_DIR),
+                    new File(mGamePrefs.coreUserConfigDir));
+            FileUtil.copyFile(new File(gameDataDir + "/" + GamePrefs.SRAM_DATA_DIR),
+                    new File(mGamePrefs.sramDataDir));
+
             CoreInterface.shutdownEmulator();
         }
 
@@ -949,6 +1235,11 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
 
     private void tryPausing()
     {
+        final String gameDataDir = mAppData.runTimeGameDataDir;
+        final String saveStatePath = gameDataDir + "/" + GamePrefs.AUTO_SAVES_DIR;
+        FileUtil.deleteFolder(new File(saveStatePath));
+        FileUtil.makeDirs(saveStatePath);
+
         CoreInterface.addOnStateCallbackListener( new CoreInterface.OnStateCallbackListener()
         {
             @Override
@@ -958,6 +1249,9 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
                 {
                     CoreInterface.removeOnStateCallbackListener( this );
                     CoreInterface.pauseEmulator();
+
+                    //Copy game data back to storage
+                    FileUtil.copyFile(new File(saveStatePath), new File(mGamePrefs.autoSaveDir));
                 }
             }
         } );
@@ -966,6 +1260,11 @@ OnPromptFinishedListener, OnSaveLoadListener, GameSurface.GameSurfaceCreatedList
         final String saveFileName = mAutoSaveManager.getAutoSaveFileName();
         CoreInterface.autoSaveState( saveFileName );
         mAutoSaveManager.clearOldest();
+
+        FileUtil.copyFile(new File(gameDataDir + "/" + GamePrefs.CORE_CONFIG_DIR),
+                new File(mGamePrefs.coreUserConfigDir));
+        FileUtil.copyFile(new File(gameDataDir + "/" + GamePrefs.SRAM_DATA_DIR),
+                new File(mGamePrefs.sramDataDir));
     }
 
     @Override

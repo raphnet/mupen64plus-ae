@@ -32,12 +32,8 @@ import android.util.Log;
 import org.mupen64plusae.v3.alpha.R;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -46,12 +42,10 @@ import paulscode.android.mupen64plusae.dialog.Prompt;
 import paulscode.android.mupen64plusae.dialog.Prompt.PromptFileListener;
 import paulscode.android.mupen64plusae.dialog.Prompt.PromptIntegerListener;
 import paulscode.android.mupen64plusae.dialog.Prompt.PromptTextListener;
-import paulscode.android.mupen64plusae.game.GameAutoSaveManager;
 import paulscode.android.mupen64plusae.game.GameSurface;
 import paulscode.android.mupen64plusae.persistent.AppData;
 import paulscode.android.mupen64plusae.persistent.GamePrefs;
 import paulscode.android.mupen64plusae.persistent.GlobalPrefs;
-import paulscode.android.mupen64plusae.util.FileUtil;
 import paulscode.android.mupen64plusae.util.Notifier;
 import paulscode.android.mupen64plusae.util.Utility;
 
@@ -105,6 +99,12 @@ public class CoreInterface
          * Called when a game is saved or a save is loaded
          */
         public void onSaveLoad();
+
+        /**
+         * Called when a game is saved or a save is loaded
+         * @param file File that was loaded
+         */
+        public void onFileSelected(File file);
     }
 
     public interface OnExitListener
@@ -178,6 +178,8 @@ public class CoreInterface
 
     private static File sCurrentSaveStateFile = null;
 
+    private static int sCurrentSlot = 0;
+
     // Slot info - used internally
     private static final int NUM_SLOTS = 10;
 
@@ -198,143 +200,12 @@ public class CoreInterface
         sAppData = new AppData( sActivity );
         sGlobalPrefs = new GlobalPrefs( sActivity, sAppData );
         sGamePrefs = gamePrefs;
-        NativeConfigFiles.syncConfigFiles( sGamePrefs, sGlobalPrefs, sAppData, openGlEsVersion );
-
-        makeDirs();
-        moveFromLegacy();
+        NativeConfigFiles.syncConfigFiles( activity, sGamePrefs, sGlobalPrefs, sAppData, openGlEsVersion );
     }
 
     public static boolean isCoreRunning()
     {
         return sIsCoreRunning;
-    }
-
-    private static void makeDirs()
-    {
-        // Make sure various directories exist so that we can write to them
-        FileUtil.makeDirs(sGamePrefs.sramDataDir);
-        FileUtil.makeDirs(sGamePrefs.sramDataDir);
-        FileUtil.makeDirs(sGamePrefs.autoSaveDir);
-        FileUtil.makeDirs(sGamePrefs.slotSaveDir);
-        FileUtil.makeDirs(sGamePrefs.userSaveDir);
-        FileUtil.makeDirs(sGamePrefs.screenshotDir);
-        FileUtil.makeDirs(sGamePrefs.coreUserConfigDir);
-        FileUtil.makeDirs(sGlobalPrefs.coreUserDataDir);
-        FileUtil.makeDirs(sGlobalPrefs.coreUserCacheDir);
-    }
-
-    /**
-     * Move any legacy files to new folder structure
-     */
-    private static void moveFromLegacy()
-    {
-        final File legacySlotPath = new File(sGlobalPrefs.legacySlotSaves);
-        final File legacyAutoSavePath = new File(sGlobalPrefs.legacyAutoSaves);
-
-        if (legacySlotPath.listFiles() != null)
-        {
-            // Move sra, mpk, fla, and eep files
-            final FileFilter fileSramFilter = new FileFilter()
-            {
-
-                @Override
-                public boolean accept(File pathname)
-                {
-                    final String fileName = pathname.getName();
-
-                    return fileName.contains(sGamePrefs.gameGoodName + ".sra")
-                        || fileName.contains(sGamePrefs.gameGoodName + ".eep")
-                        || fileName.contains(sGamePrefs.gameGoodName + ".mpk")
-                        || fileName.contains(sGamePrefs.gameGoodName + ".fla");
-                }
-            };
-
-            // Move all files found
-            for (final File file : legacySlotPath.listFiles(fileSramFilter))
-            {
-                String targetPath = sGamePrefs.sramDataDir + "/" + file.getName();
-                File targetFile = new File(targetPath);
-
-                if (!targetFile.exists())
-                {
-                    Log.i("CoreInterface", "Found legacy SRAM file: " + file + " Moving to " + targetFile.getPath());
-
-                    file.renameTo(targetFile);
-                }
-                else
-                {
-                    Log.i("CoreInterface", "Found legacy SRAM file: " + file + " but can't move");
-                }
-            }
-
-            // Move all st files
-            final FileFilter fileSlotFilter = new FileFilter()
-            {
-
-                @Override
-                public boolean accept(File pathname)
-                {
-                    final String fileName = pathname.getName();
-                    return fileName.contains(sGamePrefs.gameGoodName)
-                        && fileName.substring(fileName.length() - 3).contains("st");
-                }
-            };
-
-            for (final File file : legacySlotPath.listFiles(fileSlotFilter))
-            {
-                String targetPath = sGamePrefs.slotSaveDir + "/" + file.getName();
-                File targetFile = new File(targetPath);
-
-                if (!targetFile.exists())
-                {
-                    Log.i("CoreInterface", "Found legacy ST file: " + file + " Moving to " + targetFile.getPath());
-
-                    file.renameTo(targetFile);
-                }
-                else
-                {
-                    Log.i("CoreInterface", "Found legacy ST file: " + file + " but can't move");
-                }
-            }
-        }
-
-        if(legacyAutoSavePath.listFiles() != null)
-        {
-            //Move auto saves
-            final FileFilter fileAutoSaveFilter = new FileFilter(){
-
-                @Override
-                public boolean accept(File pathname)
-                {
-                    final String fileName = pathname.getName();
-                    return fileName.equals(sGamePrefs.legacySaveFileName + ".sav");
-                }
-            };
-
-            //Move all files found
-            for( final File file : legacyAutoSavePath.listFiles(fileAutoSaveFilter) )
-            {
-                final DateFormat dateFormat = new SimpleDateFormat(GameAutoSaveManager.sFormatString, java.util.Locale.getDefault());
-                final String dateAndTime = dateFormat.format(new Date()).toString();
-                final String fileName = dateAndTime + ".sav";
-
-                String targetPath = sGamePrefs.autoSaveDir + "/" + fileName;
-                File targetFile= new File(targetPath);
-
-                if(!targetFile.exists())
-                {
-                    Log.i("CoreInterface", "Found legacy SAV file: " + file +
-                        " Moving to " + targetFile.getPath());
-
-                    file.renameTo(targetFile);
-                }
-                else
-                {
-                    Log.i("CoreInterface", "Found legacy SAV file: " + file +
-                        " but can't move");
-                }
-            }
-        }
     }
 
     public static void registerVibrator( int player, Vibrator vibrator )
@@ -690,7 +561,13 @@ public class CoreInterface
     public static void setSlot( int value )
     {
         int slot = value % NUM_SLOTS;
+        sCurrentSlot = value;
         NativeExports.emuSetSlot( slot );
+    }
+
+    public static int getSetSlot()
+    {
+        return sCurrentSlot;
     }
 
     public static void incrementSlot()
@@ -699,28 +576,18 @@ public class CoreInterface
         setSlot( slot + 1 );
     }
 
-    public static void saveSlot(final OnSaveLoadListener onSaveLoadListener)
+    public static void saveSlot()
     {
         int slot = NativeExports.emuGetSlot();
         Notifier.showToast( sActivity, R.string.toast_savingSlot, slot );
         NativeExports.emuSaveSlot();
-
-        if(onSaveLoadListener != null)
-        {
-            onSaveLoadListener.onSaveLoad();
-        }
     }
 
-    public static void loadSlot(final OnSaveLoadListener onSaveLoadListener)
+    public static void loadSlot()
     {
         int slot = NativeExports.emuGetSlot();
         Notifier.showToast( sActivity, R.string.toast_loadingSlot, slot );
         NativeExports.emuLoadSlot();
-
-        if(onSaveLoadListener != null)
-        {
-            onSaveLoadListener.onSaveLoad();
-        }
     }
 
     public static void saveFileFromPrompt()
@@ -752,11 +619,9 @@ public class CoreInterface
             {
                 if( which >= 0 )
                 {
-                    loadState( file );
-
                     if(onSaveLoadListener != null)
                     {
-                        onSaveLoadListener.onSaveLoad();
+                        onSaveLoadListener.onFileSelected(file);
                     }
                 }
 
@@ -775,11 +640,9 @@ public class CoreInterface
             {
                 if( which >= 0 )
                 {
-                    loadState( file );
-
                     if(onSaveLoadListener != null)
                     {
-                        onSaveLoadListener.onSaveLoad();
+                        onSaveLoadListener.onFileSelected(file);
                     }
                 }
 

@@ -20,6 +20,7 @@
  */
 package paulscode.android.mupen64plusae.jni;
 
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 
 import java.io.File;
@@ -53,8 +54,8 @@ public class NativeConfigFiles
     /**
      * Populates the core configuration files with the user preferences.
      */
-    public static void syncConfigFiles( GamePrefs game, GlobalPrefs global, AppData appData,
-                                        String openGlEsVersion )
+    public static void syncConfigFiles(AppCompatActivity activity, GamePrefs game, GlobalPrefs global, AppData appData,
+                                       String openGlEsVersion )
     {
         //@formatter:off
 
@@ -94,10 +95,13 @@ public class NativeConfigFiles
         mupen64plus_cfg.put( "Core", "OnScreenDisplay", "False" );                                                          // Draw on-screen display if True, otherwise don't draw OSD
         mupen64plus_cfg.put( "Core", "R4300Emulator", game.r4300Emulator );                                                 // Use Pure Interpreter if 0, Cached Interpreter if 1, or Dynamic Recompiler if 2 or more
         mupen64plus_cfg.put( "Core", "AutoStateSlotIncrement", "False" );                                                   // Increment the save state slot after each save operation
-        mupen64plus_cfg.put( "Core", "ScreenshotPath", '"' + game.screenshotDir + '"' );                                    // Path to directory where screenshots are saved. If this is blank, the default value of ${UserConfigPath}/screenshot will be used
-        mupen64plus_cfg.put( "Core", "SaveStatePath", '"' + game.slotSaveDir + '"' );                                       // Path to directory where emulator save states (snapshots) are saved. If this is blank, the default value of ${UserConfigPath}/save will be used
-        mupen64plus_cfg.put( "Core", "SaveSRAMPath", '"' + game.sramDataDir + '"' );                                        // Path to directory where SRAM/EEPROM data (in-game saves) are stored. If this is blank, the default value of ${UserConfigPath}/save will be used
-        mupen64plus_cfg.put( "Core", "SharedDataPath", '"' + appData.coreSharedDataDir + '"' );                             // Path to a directory to search when looking for shared data files
+
+        String gameDataDir = appData.runTimeGameDataDir;
+
+        mupen64plus_cfg.put( "Core", "ScreenshotPath", '"' + gameDataDir + "/" + GamePrefs.SCREENSHOTS_DIR + '"' );        // Path to directory where screenshots are saved. If this is blank, the default value of ${UserConfigPath}/screenshot will be used
+        mupen64plus_cfg.put( "Core", "SaveStatePath", '"' + gameDataDir + "/" + GamePrefs.SLOT_SAVES_DIR + '"' );           // Path to directory where emulator save states (snapshots) are saved. If this is blank, the default value of ${UserConfigPath}/save will be used
+        mupen64plus_cfg.put( "Core", "SaveSRAMPath", '"' + gameDataDir + "/" + GamePrefs.SRAM_DATA_DIR + '"' );            // Path to directory where SRAM/EEPROM data (in-game saves) are stored. If this is blank, the default value of ${UserConfigPath}/save will be used
+        mupen64plus_cfg.put( "Core", "SharedDataPath", '"' + appData.coreSharedDataDir + '"' );                            // Path to a directory to search when looking for shared data files
 
         mupen64plus_cfg.put( "CoreEvents", "Version", "1.000000" );                                                         // Mupen64Plus CoreEvents config parameter set version number.  Please don't change this version number.
         mupen64plus_cfg.put( "CoreEvents", "Kbd Mapping Stop", EMPTY );

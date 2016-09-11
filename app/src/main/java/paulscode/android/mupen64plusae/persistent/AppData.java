@@ -25,6 +25,7 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.UiModeManager;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.SharedPreferences;
 import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageInfo;
@@ -198,8 +199,11 @@ public class AppData
     /** The parent directory containing all user-writable data files. */
     public final String userDataDir;
 
-    /** The parent directory containing all user-writable data files. */
+    /** The parent directory containing all user-writable game data files. */
     public final String gameDataDir;
+
+    /** The parent directory containing temporary game data while emulator is running */
+    public final String runTimeGameDataDir;
     
     // Shared preferences keys
     private static final String KEY_ASSET_VERSION = "assetVersion";
@@ -260,6 +264,9 @@ public class AppData
             tempGameDataDir = userDataDir;
         }
         gameDataDir = tempGameDataDir + "/GameData";
+
+        ContextWrapper contextWrapper = new ContextWrapper(context);
+        runTimeGameDataDir = contextWrapper.getFilesDir().getPath() + "/GameData";
 
         coreSharedDataDir = userDataDir + "/AppData";
         tempDir = coreSharedDataDir + "/tmp";
