@@ -7,6 +7,15 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <android/log.h>
+
+void LOG(const char * format, ...) {
+    va_list va;
+    va_start(va, format);
+    __android_log_vprint(ANDROID_LOG_ERROR, "Parallel", format, va);
+    va_end(va);
+}
+
 
 class Parallel
 {
@@ -17,8 +26,8 @@ public:
         m_task = [](uint32_t) {};
 
         // create worker threads
-        for (uint32_t worker_id = 0; worker_id < num_workers; worker_id++) {
-			m_work_available.emplace_back(false);
+        for (uint32_t worker_id = 1; worker_id < num_workers; worker_id++) {
+            m_work_available.emplace_back(false);
             m_workers.emplace_back(std::thread(&Parallel::do_work, this, worker_id));
         }
 
@@ -32,9 +41,9 @@ public:
 
         // exit worker main loops
         m_accept_work = false;
-		for (auto&& workAvailable : m_work_available) {
-			workAvailable = true;
-		}
+        for (auto&& workAvailable : m_work_available) {
+            workAvailable = true;
+        }
         m_signal_work.notify_all();
 
         // join worker threads to make sure they have finished
@@ -54,25 +63,29 @@ public:
 
         // prepare task for workers and send signal so they start working
         m_task = task;
-		for (auto&& workAvailable : m_work_available) {
-			workAvailable = true;
-		}
+        for (auto&& workAvailable : m_work_available) {
+            workAvailable = true;
+        }
 
+
+		LOG("WORK START");
         m_signal_work.notify_all();
+		m_task(0);
 
         // wait for all workers to finish
         wait();
+		LOG("WORK END");
     }
 
 private:
     std::function<void(uint32_t)> m_task;
     std::vector<std::thread> m_workers;
     std::mutex m_done_mutex;
-	std::mutex m_work_mutex;
-	std::mutex m_signal_mutex;
+    std::mutex m_work_mutex;
+    std::mutex m_signal_mutex;
     std::condition_variable m_signal_work;
     std::condition_variable m_signal_done;
-	std::vector<bool> m_work_available;
+    std::vector<bool> m_work_available;
     std::atomic_bool m_accept_work{true};
 
     void do_work(int32_t worker_id) {
@@ -84,41 +97,48 @@ private:
                 m_task(worker_id);
             }
 
-			{
-				std::unique_lock<std::mutex> ul(m_signal_mutex);
+            {
+                std::unique_lock<std::mutex> ul(m_signal_mutex);
 
-				// task is done, update number of active workers
-				// and signal main thread
-				m_work_available[worker_id] = false;
+                // task is done, update number of active workers
+                // and signal main thread
+                m_work_available[worker_id-1] = false;
 
-				bool readyToSignal = true;
-				for (int index = 0; index < m_work_available.size() && readyToSignal; ++index) {
-					readyToSignal = !m_work_available[index];
-				}
+                bool readyToSignal = true;
+                for (int index = 0; index < m_work_available.size() && readyToSignal; ++index) {
+                    readyToSignal = !m_work_available[index];
+                }
 
-				if(readyToSignal) {
-					m_signal_done.notify_one();
-				}
-			}
+                if(readyToSignal) {
+                    LOG("%d: ABOUT TO SIGNAL", worker_id);
+                    m_signal_done.notify_one();
+                    LOG("%d: SIGNALED", worker_id);
+                }
+            }
 
             // go idle and wait for more work
-			std::unique_lock<std::mutex> ul(m_work_mutex);
+            std::unique_lock<std::mutex> ul(m_work_mutex);
             m_signal_work.wait(ul, [worker_id, this]{
-				bool workAvailable = m_work_available[worker_id];
-				return workAvailable;
-			});
+                bool workAvailable = m_work_available[worker_id-1];
+                return workAvailable;
+            });
+
+			LOG("%d: WORK AVAILABLE", worker_id);
         }
     }
 
     void wait() {
         std::unique_lock<std::mutex> ul(m_done_mutex);
-		m_signal_done.wait(ul, [this]{
-			for (auto workAvailable : m_work_available) {
-				if(workAvailable) return false;
-			}
+        m_signal_done.wait(ul, [this]{
 
-			return true;
-		});
+            LOG("GOT A SIGNAL");
+
+            for (auto workAvailable : m_work_available) {
+                if(workAvailable) return false;
+            }
+            LOG("RETURN TRUE");
+            return true;
+        });
     }
 
     void operator=(const Parallel&) = delete;
