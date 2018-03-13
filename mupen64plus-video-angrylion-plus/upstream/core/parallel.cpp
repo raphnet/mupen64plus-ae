@@ -93,16 +93,30 @@ private:
             if (m_accept_work) {
                 m_task(worker_id);
             }
-            
-            std::unique_lock<std::mutex> ul(m_signal_mutex);
-            
-            // task is done, update number of active workers
-            // and signal main thread
-            m_work_available[worker_id] = false;
 
-            m_signal_done.notify_one();
-        
+			{
+				std::unique_lock<std::mutex> ul(m_signal_mutex);
+
+				// task is done, update number of active workers
+				// and signal main thread
+				m_work_available[worker_id] = false;
+
+				m_signal_done.notify_one();
+			}
+
+#ifdef ANDROID
+			//Busy loop wait for a bit to keep cores awake
+			bool workAvailable = false;
+			int count = 0;
+			while (!workAvailable && count++ < 10000) {
+				std::unique_lock<std::mutex> ul(m_signal_mutex);
+				workAvailable = m_work_available[worker_id];
+				std::this_thread::yield();
+			}
+#endif
+
             // go idle and wait for more work
+			std::unique_lock<std::mutex> ul(m_signal_mutex);
             m_signal_work.wait(ul, [worker_id, this]{
                 bool workAvailable = m_work_available[worker_id];
                 return workAvailable;
@@ -111,6 +125,25 @@ private:
     }
 
     void wait() {
+
+#ifdef ANDROID
+		//Busy loop wait for a bit to keep cores awake
+		bool waitingForWorkDone = true;
+		int count = 0;
+		while (waitingForWorkDone && count++ < 10000) {
+
+			waitingForWorkDone = false;
+
+			std::unique_lock<std::mutex> ul(m_signal_mutex);
+			for (unsigned int index = 0; index < m_work_available.size() && !waitingForWorkDone; ++index) {
+				waitingForWorkDone = m_work_available[index];
+			}
+
+			std::this_thread::yield();
+		}
+#endif
+
+		//Switch to idle waiting
         std::unique_lock<std::mutex> ul(m_signal_mutex);
         m_signal_done.wait(ul, [this]{
 
