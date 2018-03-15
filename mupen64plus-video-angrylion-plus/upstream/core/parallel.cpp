@@ -11,20 +11,21 @@
 class Parallel
 {
 public:
-    Parallel(uint32_t num_workers) {
+    Parallel(uint32_t num_workers) :
+        m_num_workers(num_workers)
+    {
 
         // give workers an empty task
         m_task = [](uint32_t) {};
         m_accept_work = true;
-        m_num_workers = num_workers;
 
         // set work available status
-        for (uint32_t worker_id = 0; worker_id < num_workers-1; worker_id++) {
+        for (uint32_t worker_id = 0; worker_id < m_num_workers; worker_id++) {
             m_work_available.emplace_back(true);
         }
 
         // create worker threads
-        for (uint32_t worker_id = 0; worker_id < num_workers-1; worker_id++) {
+        for (uint32_t worker_id = 0; worker_id < m_num_workers; worker_id++) {
             m_workers.emplace_back(std::thread(&Parallel::do_work, this, worker_id));
         }
 
@@ -63,27 +64,25 @@ public:
 
         {
             std::unique_lock<std::mutex> ul(m_signal_mutex);
-            for (auto&& workAvailable : m_work_available) {
-                workAvailable = true;
-            }
+			std::fill(m_work_available.begin(), m_work_available.end(), true);
         }
 
         m_signal_work.notify_all();
-        m_task(m_num_workers-1);
+        m_task(m_num_workers);
 
         // wait for all workers to finish
         wait();
     }
 
 private:
-    std::function<void(uint32_t)> m_task;
+    std::function<void(int32_t)> m_task;
     std::vector<std::thread> m_workers;
     std::mutex m_signal_mutex;
     std::condition_variable m_signal_work;
     std::condition_variable m_signal_done;
     std::vector<bool> m_work_available;
-    bool m_accept_work;
-    uint32_t m_num_workers;
+    std::atomic_bool m_accept_work;
+    const uint32_t m_num_workers;
 
     void do_work(int32_t worker_id) {
 
@@ -94,32 +93,32 @@ private:
                 m_task(worker_id);
             }
 
-			{
-				std::unique_lock<std::mutex> ul(m_signal_mutex);
+            {
+                std::unique_lock<std::mutex> ul(m_signal_mutex);
 
-				// task is done, update number of active workers
-				// and signal main thread
-				m_work_available[worker_id] = false;
+                // task is done, update number of active workers
+                // and signal main thread
+                m_work_available[worker_id] = false;
 
-				m_signal_done.notify_one();
-			}
+                m_signal_done.notify_one();
+            }
 
 #ifdef ANDROID
-			//Busy loop wait for a bit to keep cores awake
-			bool workAvailable = false;
-			int count = 0;
-			while (!workAvailable && count++ < 10000) {
-				std::unique_lock<std::mutex> ul(m_signal_mutex);
-				workAvailable = m_work_available[worker_id];
-				std::this_thread::yield();
-			}
+            //Busy loop wait for a bit to keep cores awake
+            bool workAvailable = false;
+            int count = 0;
+            while (!workAvailable && count++ < 10000) {
+                std::unique_lock<std::mutex> ul(m_signal_mutex);
+                workAvailable = m_work_available[worker_id];
+                std::this_thread::yield();
+            }
 #endif
 
             // go idle and wait for more work
-			std::unique_lock<std::mutex> ul(m_signal_mutex);
+            std::unique_lock<std::mutex> ul(m_signal_mutex);
             m_signal_work.wait(ul, [worker_id, this]{
-                bool workAvailable = m_work_available[worker_id];
-                return workAvailable;
+                bool workAvailableNow = m_work_available[worker_id];
+                return workAvailableNow;
             });
         }
     }
@@ -127,23 +126,23 @@ private:
     void wait() {
 
 #ifdef ANDROID
-		//Busy loop wait for a bit to keep cores awake
-		bool waitingForWorkDone = true;
-		int count = 0;
-		while (waitingForWorkDone && count++ < 10000) {
+        //Busy loop wait for a bit to keep cores awake
+        bool waitingForWorkDone = true;
+        int count = 0;
+        while (waitingForWorkDone && count++ < 10000) {
 
-			waitingForWorkDone = false;
+            waitingForWorkDone = false;
 
-			std::unique_lock<std::mutex> ul(m_signal_mutex);
-			for (unsigned int index = 0; index < m_work_available.size() && !waitingForWorkDone; ++index) {
-				waitingForWorkDone = m_work_available[index];
-			}
+            std::unique_lock<std::mutex> ul(m_signal_mutex);
+            for (unsigned int index = 0; index < m_work_available.size() && !waitingForWorkDone; ++index) {
+                waitingForWorkDone = m_work_available[index];
+            }
 
-			std::this_thread::yield();
-		}
+            std::this_thread::yield();
+        }
 #endif
 
-		//Switch to idle waiting
+        //Switch to idle waiting
         std::unique_lock<std::mutex> ul(m_signal_mutex);
         m_signal_done.wait(ul, [this]{
 
@@ -169,7 +168,7 @@ void parallel_init(uint32_t num)
         num = std::thread::hardware_concurrency();
     }
 
-    parallel = std::make_unique<Parallel>(num);
+    parallel = std::make_unique<Parallel>(num-1);
 
     worker_num = num;
 }
