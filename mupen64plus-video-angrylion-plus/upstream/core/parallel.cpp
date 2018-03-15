@@ -20,9 +20,7 @@ public:
         m_accept_work = true;
 
         // set work available status
-        for (uint32_t worker_id = 0; worker_id < m_num_workers; worker_id++) {
-            m_work_available.emplace_back(true);
-        }
+        m_work_available.resize(m_num_workers, true);
 
         // create worker threads
         for (uint32_t worker_id = 0; worker_id < m_num_workers; worker_id++) {
@@ -39,9 +37,8 @@ public:
 
         // exit worker main loops
         m_accept_work = false;
-        for (auto&& workAvailable : m_work_available) {
-            workAvailable = true;
-        }
+        std::fill(m_work_available.begin(), m_work_available.end(), true);
+
         m_signal_work.notify_all();
 
         // join worker threads to make sure they have finished
