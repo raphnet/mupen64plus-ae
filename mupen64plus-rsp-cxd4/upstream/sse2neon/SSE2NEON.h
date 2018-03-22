@@ -856,6 +856,11 @@ FORCE_INLINE __m128i _mm_cmplt_epu16(__m128i a, __m128i b)
 	return (__m128i)vcltq_u16((uint16x8_t)a, (uint16x8_t)b);
 }
 
+FORCE_INLINE __m128i _mm_cmplt_epi16(__m128i a, __m128i b)
+{
+	return (__m128i)vcltq_s16((int16x8_t)a, (int16x8_t)b);
+}
+
 // Compares the 4 signed 32-bit integers in a and the 4 signed 32-bit integers in b for greater than. https://msdn.microsoft.com/en-us/library/vstudio/1s9f2z0y(v=vs.100).aspx
 FORCE_INLINE __m128i _mm_cmpgt_epi32(__m128i a, __m128i b)
 {
