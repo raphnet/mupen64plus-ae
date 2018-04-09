@@ -56,6 +56,7 @@ FrameBuffer::FrameBuffer()
 {
 	m_loadTileOrigin.uls = m_loadTileOrigin.ult = 0;
 	m_pTexture = textureCache().addFrameBufferTexture(config.video.multisampling != 0);
+    m_pN64Depth =  textureCache().addFrameBufferTexture(config.video.multisampling != 0);
 	m_FBO = gfxContext.createFramebuffer();
 }
 
@@ -66,6 +67,7 @@ FrameBuffer::~FrameBuffer()
 	gfxContext.deleteFramebuffer(m_SubFBO);
 
 	textureCache().removeFrameBufferTexture(m_pTexture);
+    textureCache().removeFrameBufferTexture(m_pN64Depth);
 	textureCache().removeFrameBufferTexture(m_pResolveTexture);
 	textureCache().removeFrameBufferTexture(m_pSubTexture);
 }
@@ -97,7 +99,7 @@ void FrameBuffer::_initTexture(u16 _width, u16 _height, u16 _format, u16 _size, 
 		_pTexture->textureBytes *= fbTexFormats.monochromeFormatBytes;
 }
 
-void FrameBuffer::_setAndAttachTexture(ObjectHandle _fbo, CachedTexture *_pTexture, u32 _t, bool _multisampling)
+void FrameBuffer::_setAndAttachTexture(ObjectHandle _fbo, CachedTexture *_pTexture, u32 _t, bool _multisampling, graphics::BufferAttachmentParam _attachment)
 {
 	const FramebufferTextureFormats & fbTexFormat = gfxContext.getFramebufferTextureFormats();
 	Context::InitTextureParams initParams;
@@ -131,7 +133,7 @@ void FrameBuffer::_setAndAttachTexture(ObjectHandle _fbo, CachedTexture *_pTextu
 	Context::FrameBufferRenderTarget bufTarget;
 	bufTarget.bufferHandle = _fbo;
 	bufTarget.bufferTarget = bufferTarget::FRAMEBUFFER;
-	bufTarget.attachment = bufferAttachment::COLOR_ATTACHMENT0;
+	bufTarget.attachment = _attachment;
 	bufTarget.textureTarget = _multisampling ? textureTarget::TEXTURE_2D_MULTISAMPLE : textureTarget::TEXTURE_2D;
 	bufTarget.textureHandle = _pTexture->name;
 	gfxContext.addFrameBufferRenderTarget(bufTarget);
@@ -176,20 +178,23 @@ void FrameBuffer::init(u32 _address, u16 _format, u16 _size, u16 _width, bool _c
 
 	const u16 maxHeight = VI_GetMaxBufferHeight(_width);
 	_initTexture(_width, maxHeight, _format, _size, m_pTexture);
+    _initTexture(_width, maxHeight, _format, _size, m_pN64Depth);
 
 	if (config.video.multisampling != 0) {
-		_setAndAttachTexture(m_FBO, m_pTexture, 0, true);
+		_setAndAttachTexture(m_FBO, m_pTexture, 0, true, bufferAttachment::COLOR_ATTACHMENT0);
 		m_pTexture->frameBufferTexture = CachedTexture::fbMultiSample;
 
 		m_pResolveTexture = textureCache().addFrameBufferTexture(false);
 		_initTexture(_width, maxHeight, _format, _size, m_pResolveTexture);
 		m_resolveFBO = gfxContext.createFramebuffer();
-		_setAndAttachTexture(m_resolveFBO, m_pResolveTexture, 0, false);
+		_setAndAttachTexture(m_resolveFBO, m_pResolveTexture, 0, false, bufferAttachment::COLOR_ATTACHMENT0);
 		assert(!gfxContext.isFramebufferError());
 
 		gfxContext.bindFramebuffer(bufferTarget::FRAMEBUFFER, m_FBO);
-	} else
-		_setAndAttachTexture(m_FBO, m_pTexture, 0, false);
+	} else {
+        _setAndAttachTexture(m_FBO, m_pTexture, 0, false, bufferAttachment::COLOR_ATTACHMENT0);
+        _setAndAttachTexture(m_FBO, m_pN64Depth, 0, false, bufferAttachment::COLOR_ATTACHMENT1);
+    }
 
 	wnd.getDrawer().clearColorBuffer(nullptr);
 }
@@ -366,7 +371,7 @@ bool FrameBuffer::_initSubTexture(u32 _t)
 	m_pSubTexture->offsetT = 0.0f;
 
 
-	_setAndAttachTexture(m_SubFBO, m_pSubTexture, _t, false);
+	_setAndAttachTexture(m_SubFBO, m_pSubTexture, _t, false, bufferAttachment::COLOR_ATTACHMENT0);
 
 	return true;
 }

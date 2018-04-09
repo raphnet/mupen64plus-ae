@@ -50,6 +50,7 @@ struct FrameBuffer
 
 	graphics::ObjectHandle m_FBO;
 	CachedTexture *m_pTexture;
+	CachedTexture *m_pN64Depth;
 	DepthBuffer *m_pDepthBuffer;
 
 	// multisampling
@@ -73,7 +74,7 @@ private:
 	} m_clearParams;
 
 	void _initTexture(u16 _width, u16 _height, u16 _format, u16 _size, CachedTexture *_pTexture);
-	void _setAndAttachTexture(graphics::ObjectHandle _fbo, CachedTexture *_pTexture, u32 _t, bool _multisampling);
+	void _setAndAttachTexture(graphics::ObjectHandle _fbo, CachedTexture *_pTexture, u32 _t, bool _multisampling, graphics::BufferAttachmentParam _attachment);
 	bool _initSubTexture(u32 _t);
 	CachedTexture * _getSubTexture(u32 _t);
 	mutable u32 m_validityChecked;

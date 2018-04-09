@@ -56,6 +56,7 @@ namespace glsl {
 		ShadowMapFragmentShader(const opengl::GLInfo & _glinfo)
 		{
 			m_part =
+                    "#extension GL_ARM_shader_framebuffer_fetch_depth_stencil : enable	\n"
 				"uniform lowp usampler2D uZlutImage;\n"
 				"uniform lowp usampler2D uTlutImage;\n"
 				"uniform sampler2D uDepthImage;		\n"

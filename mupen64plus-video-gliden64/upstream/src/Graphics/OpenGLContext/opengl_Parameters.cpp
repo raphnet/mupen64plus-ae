@@ -50,6 +50,7 @@ namespace graphics {
 
 	namespace bufferAttachment {
 		BufferAttachmentParam COLOR_ATTACHMENT0(GL_COLOR_ATTACHMENT0);
+		BufferAttachmentParam COLOR_ATTACHMENT1(GL_COLOR_ATTACHMENT1);
 		BufferAttachmentParam DEPTH_ATTACHMENT(GL_DEPTH_ATTACHMENT);
 	}
 

@@ -477,9 +477,9 @@ public:
 			} else if (_glinfo.arm_fetch) {
 				ss << "#extension GL_ARM_shader_framebuffer_fetch : enable" << std::endl;
 			}
-			if (_glinfo.fetch_depth) {
-				ss << "#extension GL_ARM_shader_framebuffer_fetch_depth_stencil : enable" << std::endl;
-			}
+			//if (_glinfo.fetch_depth) {
+			//	ss << "#extension GL_ARM_shader_framebuffer_fetch_depth_stencil : enable" << std::endl;
+			//}
 
 			ss << "# define IN in" << std::endl
 				<< "# define OUT out" << std::endl
@@ -495,7 +495,7 @@ public:
 			ss << "# define IN in" << std::endl
 				<< "# define OUT out" << std::endl
 				<< "# define texture2D texture" << std::endl;
-			m_part = ss.str();
+            m_part = ss.str();
 		}
 	}
 };
@@ -594,7 +594,7 @@ public:
 	{
 		m_part =
 			"  if (uFogUsage == 1) \n"
-			"    fragColor.rgb = mix(fragColor.rgb, uFogColor.rgb, vShadeColor.a); \n"
+			"    fragColor[0].rgb = mix(fragColor[0].rgb, uFogColor.rgb, vShadeColor.a); \n"
 			;
 	}
 };
@@ -797,7 +797,7 @@ public:
 			"IN highp vec2 vTexCoord1;\n"
 			"IN mediump vec2 vLodTexCoord;\n"
 			"IN lowp float vNumLights;	\n"
-			"OUT lowp vec4 fragColor;	\n"
+			"inout lowp vec4 fragColor[2];	\n"
 		;
 	}
 };
@@ -862,7 +862,8 @@ public:
 		m_part +=
 			"IN lowp vec4 vShadeColor;	\n"
 			"IN lowp float vNumLights;	\n"
-			"OUT lowp vec4 fragColor;	\n";
+			"inout lowp vec4 fragColor[2];	\n"
+				;
 	}
 };
 
@@ -964,8 +965,6 @@ public:
 		if (config.frameBufferEmulation.N64DepthCompare != 0) {
 
 			m_part +=
-				"layout(binding = 2, r32f) highp uniform coherent image2D uDepthImageZ;		\n"
-				"layout(binding = 3, r32f) highp uniform coherent image2D uDepthImageDeltaZ;\n"
 				"bool depth_compare(highp float curZ);\n"
 				"bool depth_render(highp float Z, highp float curZ);\n";
 			;
@@ -1035,7 +1034,7 @@ public:
 					;
 				if (m_glinfo.ext_fetch) {
 					shaderPart +=
-						"    name = gl_LastFragData[0];	\\\n"
+						"    name = fragColor[0];	\\\n"
 						;
 				} else if (m_glinfo.arm_fetch) {
 					shaderPart +=
@@ -1047,7 +1046,8 @@ public:
 						"    name = texelFetch(tex, coord, 0);								\\\n"
 						;
 				}
-					"  } else {															\\\n"
+                shaderPart +=
+                        "  } else {															\\\n"
 					"    if (uTextureFilterMode == 0) name = texture(tex, texCoord);	\\\n"
 					"    else TEX_FILTER(name, tex, texCoord);			 				\\\n"
 					"  }																\\\n"
@@ -1129,7 +1129,7 @@ public:
 				;
 			if (_glinfo.ext_fetch) {
 				m_part +=
-					"    name = gl_LastFragData[0]; \\\n"
+					"    name = fragColor[0]; \\\n"
 					;
 			} else if (_glinfo.arm_fetch) {
 				m_part +=
@@ -1366,7 +1366,7 @@ public:
 	{
 		if (config.frameBufferEmulation.N64DepthCompare != 0) {
 			m_part =
-				"  if (uRenderTarget != 0) { if (!depth_render(fragColor.r, fragDepth)) discard; } \n"
+				"  if (uRenderTarget != 0) { if (!depth_render(fragColor[0].r, fragDepth)) discard; } \n"
 				"  else if (!depth_compare(fragDepth)) discard; \n"
 			;
 		}
@@ -1385,7 +1385,7 @@ public:
 				"      ivec2 coord = ivec2(gl_FragCoord.xy);	\n"
 				"      if (fragDepth >= texelFetch(uDepthTex, coord, 0).r) discard;	\n"
 				"    }											\n"
-				"    fragDepth = fragColor.r;				\n"
+				"    fragDepth = fragColor[0].r;				\n"
 				"  }											\n"
 				"  gl_FragDepth = fragDepth;	\n"
 			;
@@ -1400,7 +1400,7 @@ public:
 	{
 		if (_glinfo.isGLES2) {
 			m_part =
-				"  gl_FragColor = fragColor; \n"
+				"  gl_FragColor = fragColor[0]; \n"
 				"} \n\n"
 				;
 		} else {
@@ -1936,15 +1936,15 @@ public:
 				"bool depth_compare(highp float curZ)									\n"
 				"{														\n"
 				"  ivec2 coord = ivec2(gl_FragCoord.xy);				\n"
-				"  highp vec4 depthZ = imageLoad(uDepthImageZ,coord);	\n"
-				"  highp vec4 depthDeltaZ = imageLoad(uDepthImageDeltaZ,coord);\n"
-				"  highp float bufZ = depthZ.r;							\n"
+				"  highp float depthZ = fragColor[1].x;	\n"
+				"  highp float depthDeltaZ = fragColor[1].y;\n"
+				"  highp float bufZ = depthZ;							\n"
 				"  highp float dz, dzMin;								\n"
 				"  if (uDepthSource == 1) {								\n"
 				"     dzMin = dz = uDeltaZ;								\n"
 				"  } else {												\n"
 				"    dz = 4.0*fwidth(curZ);						\n"
-				"    dzMin = min(dz, depthDeltaZ.r);					\n"
+				"    dzMin = min(dz, depthDeltaZ);					\n"
 				"  }													\n"
 				"  bool bInfront = curZ < bufZ;							\n"
 				"  bool bFarther = (curZ + dzMin) >= bufZ;				\n"
@@ -1967,12 +1967,11 @@ public:
 				"       break;											\n"
 				"  }													\n"
 				"  if (uEnableDepthUpdate != 0  && bRes) {				\n"
-				"    highp vec4 depthOutZ = vec4(curZ, 1.0, 1.0, 1.0); \n"
-				"    highp vec4 depthOutDeltaZ = vec4(dz, 1.0, 1.0, 1.0); \n"
-				"    imageStore(uDepthImageZ, coord, depthOutZ);		\n"
-				"    imageStore(uDepthImageDeltaZ, coord, depthOutDeltaZ);\n"
+				"    highp float depthOutZ = curZ; \n"
+				"    highp float depthOutDeltaZ = dz; \n"
+				"  fragColor[1].x = depthOutZ;			\n"
+				"  fragColor[1].y = depthOutDeltaZ;			\n"
 				"  }													\n"
-				"  memoryBarrierImage();								\n"
 				"  if (uEnableDepthCompare != 0)						\n"
 				"    return bRes;										\n"
 				"  return true;											\n"
@@ -1995,15 +1994,14 @@ public:
 				"{														\n"
 				"  ivec2 coord = ivec2(gl_FragCoord.xy);				\n"
 				"  if (uEnableDepthCompare != 0) {						\n"
-				"    highp vec4 depthZ = imageLoad(uDepthImageZ,coord);	\n"
-				"    highp float bufZ = depthZ.r;						\n"
+				"    highp float depthZ = fragColor[1].x;	\n"
+				"    highp float bufZ = depthZ;						\n"
 				"    if (curZ >= bufZ) return false;					\n"
 				"  }													\n"
-				"  highp vec4 depthOutZ = vec4(Z, 1.0, 1.0, 1.0);		\n"
-				"  highp vec4 depthOutDeltaZ = vec4(0.0, 1.0, 1.0, 1.0);\n"
-				"  imageStore(uDepthImageZ,coord, depthOutZ);			\n"
-				"  imageStore(uDepthImageDeltaZ,coord, depthOutDeltaZ);	\n"
-				"  memoryBarrierImage();								\n"
+				"  highp float depthOutZ = Z;		\n"
+				"  highp float depthOutDeltaZ = 0.0;\n"
+				"  fragColor[1].x = depthOutZ;			\n"
+				"  fragColor[1].y = depthOutDeltaZ;			\n"
 				"  return true;											\n"
 				"}														\n"
 			;
@@ -2130,10 +2128,10 @@ CombinerInputs CombinerProgramBuilder::compileCombiner(const CombinerKey & _key,
 		if (g_cycleType == G_CYC_2CYCLE)
 			m_blender2->write(ssShader);
 
-		ssShader << "  fragColor = clampedColor;" << std::endl;
+		ssShader << "  fragColor[0] = clampedColor;" << std::endl;
 	}
 	else {
-		ssShader << "  fragColor = clampedColor;" << std::endl;
+		ssShader << "  fragColor[0] = clampedColor;" << std::endl;
 		m_legacyBlender->write(ssShader);
 	}
 
@@ -2276,7 +2274,7 @@ graphics::CombinerProgram * CombinerProgramBuilder::buildCombinerProgram(Combine
 	const GLchar * strShaderData = strFragmentShader.data();
 	glShaderSource(fragmentShader, 1, &strShaderData, nullptr);
 	glCompileShader(fragmentShader);
-	if (!Utils::checkShaderCompileStatus(fragmentShader))
+	//if (!Utils::checkShaderCompileStatus(fragmentShader))
 	Utils::logErrorShader(GL_FRAGMENT_SHADER, strFragmentShader);
 
 	GLuint program = glCreateProgram();

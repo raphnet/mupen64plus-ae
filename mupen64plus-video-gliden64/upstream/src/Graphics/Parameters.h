@@ -50,6 +50,7 @@ namespace graphics {
 
 	namespace bufferAttachment {
 		extern BufferAttachmentParam COLOR_ATTACHMENT0;
+		extern BufferAttachmentParam COLOR_ATTACHMENT1;
 		extern BufferAttachmentParam DEPTH_ATTACHMENT;
 	}
 
