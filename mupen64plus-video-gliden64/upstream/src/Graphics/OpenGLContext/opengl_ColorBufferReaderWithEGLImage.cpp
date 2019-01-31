@@ -20,6 +20,7 @@ ColorBufferReaderWithEGLImage::ColorBufferReaderWithEGLImage(CachedTexture *_pTe
 
 ColorBufferReaderWithEGLImage::~ColorBufferReaderWithEGLImage()
 {
+    AHardwareBuffer_release(m_hardwareBuffer);
 }
 
 
@@ -31,6 +32,7 @@ void ColorBufferReaderWithEGLImage::_initBuffers()
 		AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE,
 		0,0};
 	AHardwareBuffer_allocate(&bufferDesc, &m_hardwareBuffer);
+    AHardwareBuffer_acquire(m_hardwareBuffer);
 	//m_window.reallocate(m_pTexture->realWidth, m_pTexture->realHeight,
 	//	HAL_PIXEL_FORMAT_RGBA_8888, GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_HW_TEXTURE);
 	EGLint eglImgAttrs[] = { EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE, EGL_NONE };
