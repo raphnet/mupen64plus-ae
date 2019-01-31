@@ -135,7 +135,7 @@ MY_LOCAL_CPPFLAGS := $(COMMON_CPPFLAGS) -std=c++11 -g
 
 MY_LOCAL_LDFLAGS := $(COMMON_LDFLAGS) -Wl,-version-script,$(LOCAL_PATH)/$(SRCDIR)/mupenplus/video_api_export.ver
 
-MY_LOCAL_LDLIBS := -llog -latomic -lEGL
+MY_LOCAL_LDLIBS := -llog -latomic -lEGL -lnativewindow
 
 ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
     # Use for ARM7a:

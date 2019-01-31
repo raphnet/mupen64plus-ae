@@ -345,18 +345,18 @@ graphics::PixelReadBuffer * ContextImpl::createPixelReadBuffer(size_t _sizeInByt
 
 graphics::ColorBufferReader * ContextImpl::createColorBufferReader(CachedTexture * _pTexture)
 {
-	if (m_glInfo.bufferStorage && m_glInfo.renderer != Renderer::Intel)
-		return new ColorBufferReaderWithBufferStorage(_pTexture, m_cachedFunctions->getCachedBindBuffer());
+	//if (m_glInfo.bufferStorage && m_glInfo.renderer != Renderer::Intel)
+	//	return new ColorBufferReaderWithBufferStorage(_pTexture, m_cachedFunctions->getCachedBindBuffer());
 
-	if (!m_glInfo.isGLES2)
-		return new ColorBufferReaderWithPixelBuffer(_pTexture, m_cachedFunctions->getCachedBindBuffer());
+	//if (!m_glInfo.isGLES2)
+	//	return new ColorBufferReaderWithPixelBuffer(_pTexture, m_cachedFunctions->getCachedBindBuffer());
 
-#if defined(EGL) && defined(OS_ANDROID)
-	if(config.frameBufferEmulation.copyToRDRAM > Config::ctSync)
+//#if defined(EGL) && defined(OS_ANDROID)
+	//if(config.frameBufferEmulation.copyToRDRAM > Config::ctSync)
 		return new ColorBufferReaderWithEGLImage(_pTexture, m_cachedFunctions->getCachedBindTexture());
-#endif
+//#endif
 
-	return new ColorBufferReaderWithReadPixels(_pTexture);
+	//return new ColorBufferReaderWithReadPixels(_pTexture);
 }
 
 /*---------------Shaders-------------*/

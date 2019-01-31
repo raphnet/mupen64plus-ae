@@ -3,7 +3,7 @@
 #include <Graphics/ColorBufferReader.h>
 #include "opengl_CachedFunctions.h"
 
-#include <Graphics/OpenGLContext/GraphicBufferPrivateApi/GraphicBuffer.h>
+#include <android/hardware_buffer.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
@@ -26,7 +26,7 @@ private:
 	void _initBuffers();
 
 	CachedBindTexture * m_bindTexture;
-	GraphicBuffer m_window{};
+	AHardwareBuffer* m_hardwareBuffer;
 	EGLImageKHR m_image;
 	PFNGLEGLIMAGETARGETTEXTURE2DOESPROC m_glEGLImageTargetTexture2DOES;
 	bool m_bufferLocked;
